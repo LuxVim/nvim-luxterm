@@ -1,3 +1,5 @@
+local file_io = require('luxterm.utils.file_io')
+
 local M = {}
 
 local config = require('luxterm.config')

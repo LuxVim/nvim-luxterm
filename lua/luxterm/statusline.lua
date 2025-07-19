@@ -69,44 +69,26 @@ function M.get_detailed_string()
 end
 
 function M.setup_integrations()
-  if vim.fn.exists('*airline#parts#define_function') == 1 then
-    M.airline_integration()
+  local airline = require('luxterm.integrations.statusline.airline')
+  local lightline = require('luxterm.integrations.statusline.lightline')
+  
+  if airline.is_available() then
+    airline.setup()
   end
   
-  if vim.g.lightline then
-    M.lightline_integration()
+  if lightline.is_available() then
+    lightline.setup()
   end
 end
 
 function M.airline_integration()
-  vim.cmd([[
-    if exists('*airline#parts#define_function')
-      call airline#parts#define_function('luxterm', 'v:lua.require("luxterm.statusline").get_compact_string')
-      let g:airline_section_x = get(g:, 'airline_section_x', '') . airline#section#create_right(['luxterm'])
-    endif
-  ]])
+  local airline = require('luxterm.integrations.statusline.airline')
+  return airline.setup()
 end
 
 function M.lightline_integration()
-  if not vim.g.lightline then
-    vim.g.lightline = {}
-  end
-  
-  if not vim.g.lightline.component_function then
-    vim.g.lightline.component_function = {}
-  end
-  
-  vim.g.lightline.component_function.luxterm = 'v:lua.require("luxterm.statusline").get_compact_string'
-  
-  if not vim.g.lightline.active then
-    vim.g.lightline.active = {}
-  end
-  
-  if not vim.g.lightline.active.right then
-    vim.g.lightline.active.right = {}
-  end
-  
-  table.insert(vim.g.lightline.active.right, { 'luxterm' })
+  local lightline = require('luxterm.integrations.statusline.lightline')
+  return lightline.setup()
 end
 
 function M.get_terminal_status(terminal_name)

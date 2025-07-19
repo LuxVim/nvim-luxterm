@@ -1,3 +1,5 @@
+local file_io = require('luxterm.utils.file_io')
+
 local M = {}
 
 local config = require('luxterm.config')
@@ -137,107 +139,43 @@ function M.export_history(terminal_name, filename)
     return false
   end
   
-  local data = vim.fn.json_encode(history[terminal_name])
-  vim.uv.fs_open(filename, 'w', 438, function(err, fd)
-    if err or not fd then
-      vim.notify('LuxTerm: Failed to open history file: ' .. (err or 'unknown'), vim.log.levels.WARN)
-      return
+  file_io.save_json_async(filename, history[terminal_name], function(success)
+    if success then
+      vim.notify('LuxTerm: History exported successfully', vim.log.levels.INFO)
     end
-    
-    vim.uv.fs_write(fd, data, -1, function(err)
-      vim.uv.fs_close(fd, function() end)
-      if err then
-        vim.notify('LuxTerm: Failed to export history: ' .. err, vim.log.levels.WARN)
-      end
-    end)
   end)
   return true
 end
 
 function M.import_history(terminal_name, filename)
-  vim.uv.fs_stat(filename, function(err, stat)
-    if err or not stat then
-      return
+  file_io.load_json_async(filename, function(parsed_data)
+    if parsed_data then
+      history[terminal_name] = parsed_data
+      current_index[terminal_name] = #parsed_data
+      M.save()
+      vim.notify('LuxTerm: History imported successfully', vim.log.levels.INFO)
     end
-    
-    vim.uv.fs_open(filename, 'r', 438, function(err, fd)
-      if err or not fd then
-        return
-      end
-      
-      vim.uv.fs_read(fd, stat.size, 0, function(err, data)
-        vim.uv.fs_close(fd, function() end)
-        
-        if err or not data or data == '' then
-          return
-        end
-        
-        local ok, parsed_data = pcall(vim.fn.json_decode, data)
-        if ok and parsed_data then
-          history[terminal_name] = parsed_data
-          current_index[terminal_name] = #parsed_data
-          M.save()
-        end
-      end)
-    end)
   end)
 end
 
 function M.save()
-  local history_file = vim.fn.expand('~/.local/share/nvim/luxterm_history.json')
-  local history_dir = vim.fn.fnamemodify(history_file, ':h')
-  
-  if vim.fn.isdirectory(history_dir) == 0 then
-    vim.fn.mkdir(history_dir, 'p')
-  end
-  
-  local data = vim.fn.json_encode({
+  local history_file = file_io.get_data_file_path('luxterm_history.json')
+  local data = {
     history = history,
     current_index = current_index
-  })
+  }
   
-  vim.uv.fs_open(history_file, 'w', 438, function(err, fd)
-    if err or not fd then
-      vim.notify('LuxTerm: Failed to open history file: ' .. (err or 'unknown'), vim.log.levels.WARN)
-      return
-    end
-    
-    vim.uv.fs_write(fd, data, -1, function(err)
-      vim.uv.fs_close(fd, function() end)
-      if err then
-        vim.notify('LuxTerm: Failed to save history: ' .. err, vim.log.levels.WARN)
-      end
-    end)
-  end)
+  file_io.save_json_async(history_file, data)
 end
 
 function M.load()
-  local history_file = vim.fn.expand('~/.local/share/nvim/luxterm_history.json')
+  local history_file = file_io.get_data_file_path('luxterm_history.json')
   
-  vim.uv.fs_stat(history_file, function(err, stat)
-    if err or not stat then
-      return
+  file_io.load_json_async(history_file, function(parsed_data)
+    if parsed_data then
+      history = parsed_data.history or {}
+      current_index = parsed_data.current_index or {}
     end
-    
-    vim.uv.fs_open(history_file, 'r', 438, function(err, fd)
-      if err or not fd then
-        return
-      end
-      
-      vim.uv.fs_read(fd, stat.size, 0, function(err, data)
-        vim.uv.fs_close(fd, function() end)
-        
-        if err or not data then
-          return
-        end
-        
-        local ok, parsed_data = pcall(vim.fn.json_decode, data)
-        if ok and parsed_data then
-          history = parsed_data.history or {}
-          current_index = parsed_data.current_index or {}
-        end
-      end)
-    end)
   end)
 end
 
