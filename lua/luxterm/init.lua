@@ -1,5 +1,5 @@
 local terminal_manager = require('luxterm.core.terminal_manager')
-local info_provider = require('luxterm.services.info_provider')
+local info_provider = require('luxterm.statusline.providers')
 
 local M = {}
 

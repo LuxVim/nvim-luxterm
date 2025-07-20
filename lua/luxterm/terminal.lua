@@ -1,36 +1,22 @@
 local M = {}
 
-local window = require('luxterm.window')
-local buffer = require('luxterm.buffer')
+local control = require('luxterm.terminal.control')
+local creation = require('luxterm.terminal.creation')
+local display = require('luxterm.terminal.display')
 
-function M.show(terminal_name)
-    local buffer_info = buffer.get(terminal_name)
-    if buffer_info then
-        window.open(terminal_name, buffer_info)
-    end
-end
+M.show = control.show
+M.hide = control.hide
+M.is_active = control.is_active
+M.close = control.close
 
-function M.hide(terminal_name)
-    window.close(terminal_name)
-end
+M.create_terminal_buffer = creation.create_terminal_buffer
+M.update_terminal_name = creation.update_terminal_name
 
-function M.is_active(terminal_name)
-    return window.is_active(terminal_name)
-end
-
-function M.close(terminal_name)
-    M.hide(terminal_name)
-  
-    local session = require('luxterm.session')
-    local terminals = session.get_terminals()
-  
-    if terminals[terminal_name] then
-        local buffer_info = terminals[terminal_name]
-        if buffer_info.bufnr and vim.api.nvim_buf_is_valid(buffer_info.bufnr) then
-            vim.api.nvim_buf_delete(buffer_info.bufnr, { force = true })
-        end
-        session.remove_terminal(terminal_name)
-    end
-end
+M.show_terminal = display.show_terminal
+M.hide_terminal = display.hide_terminal
+M.is_terminal_visible = display.is_terminal_visible
+M.focus_terminal = display.focus_terminal
+M.resize_terminal = display.resize_terminal
+M.change_terminal_position = display.change_terminal_position
 
 return M

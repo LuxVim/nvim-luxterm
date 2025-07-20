@@ -1,197 +1,35 @@
-local file_io = require('luxterm.utils.file_io')
-
 local M = {}
 
-local config = require('luxterm.config')
-
-local history = {}
-local current_index = {}
+local core = require('luxterm.history.core')
+local search = require('luxterm.history.search')
+local stats = require('luxterm.history.stats')
+local io = require('luxterm.history.io')
 
 function M.init()
-  M.load()
+  io.load()
 end
 
 function M.add_entry(terminal_name, command, directory)
-  if not history[terminal_name] then
-    history[terminal_name] = {}
-  end
-  
-  local entry = {
-    command = command,
-    directory = directory,
-    timestamp = os.time()
-  }
-  
-  table.insert(history[terminal_name], entry)
-  
-  local max_size = config.get('history_size')
-  if #history[terminal_name] > max_size then
-    table.remove(history[terminal_name], 1)
-  end
-  
-  current_index[terminal_name] = #history[terminal_name]
-  M.save()
+  core.add_entry(terminal_name, command, directory)
+  io.save()
 end
 
-function M.get_previous(terminal_name)
-  if not history[terminal_name] or #history[terminal_name] == 0 then
-    return nil
-  end
-  
-  local index = current_index[terminal_name] or #history[terminal_name]
-  if index > 1 then
-    current_index[terminal_name] = index - 1
-    return history[terminal_name][current_index[terminal_name]].command
-  end
-  
-  return nil
+M.get_previous = core.get_previous
+M.get_next = core.get_next
+M.clear = function(terminal_name)
+  core.clear(terminal_name)
+  io.save()
 end
+M.get_history = core.get_history
 
-function M.get_next(terminal_name)
-  if not history[terminal_name] or #history[terminal_name] == 0 then
-    return nil
-  end
-  
-  local index = current_index[terminal_name] or #history[terminal_name]
-  if index < #history[terminal_name] then
-    current_index[terminal_name] = index + 1
-    return history[terminal_name][current_index[terminal_name]].command
-  end
-  
-  return nil
-end
+M.search = search.search
+M.get_most_used_commands = search.get_most_used_commands
 
-function M.search(terminal_name, pattern)
-  if not history[terminal_name] then
-    return {}
-  end
-  
-  local results = {}
-  for i, entry in ipairs(history[terminal_name]) do
-    if entry.command:match(pattern) then
-      table.insert(results, {
-        index = i,
-        command = entry.command,
-        directory = entry.directory,
-        timestamp = entry.timestamp
-      })
-    end
-  end
-  
-  return results
-end
+M.get_stats = stats.get_stats
 
-function M.get_stats(terminal_name)
-  if not history[terminal_name] then
-    return {
-      total_commands = 0,
-      unique_commands = 0,
-      most_recent = nil
-    }
-  end
-  
-  local commands = {}
-  local most_recent = nil
-  
-  for _, entry in ipairs(history[terminal_name]) do
-    commands[entry.command] = (commands[entry.command] or 0) + 1
-    if not most_recent or entry.timestamp > most_recent.timestamp then
-      most_recent = entry
-    end
-  end
-  
-  return {
-    total_commands = #history[terminal_name],
-    unique_commands = vim.tbl_count(commands),
-    most_recent = most_recent
-  }
-end
-
-function M.get_most_used_commands(terminal_name, limit)
-  if not history[terminal_name] then
-    return {}
-  end
-  
-  limit = limit or 10
-  local commands = {}
-  
-  for _, entry in ipairs(history[terminal_name]) do
-    commands[entry.command] = (commands[entry.command] or 0) + 1
-  end
-  
-  local sorted = {}
-  for cmd, count in pairs(commands) do
-    table.insert(sorted, { command = cmd, count = count })
-  end
-  
-  table.sort(sorted, function(a, b) return a.count > b.count end)
-  
-  local result = {}
-  for i = 1, math.min(limit, #sorted) do
-    table.insert(result, sorted[i])
-  end
-  
-  return result
-end
-
-function M.export_history(terminal_name, filename)
-  if not history[terminal_name] then
-    return false
-  end
-  
-  file_io.save_json_async(filename, history[terminal_name], function(success)
-    if success then
-      vim.notify('LuxTerm: History exported successfully', vim.log.levels.INFO)
-    end
-  end)
-  return true
-end
-
-function M.import_history(terminal_name, filename)
-  file_io.load_json_async(filename, function(parsed_data)
-    if parsed_data then
-      history[terminal_name] = parsed_data
-      current_index[terminal_name] = #parsed_data
-      M.save()
-      vim.notify('LuxTerm: History imported successfully', vim.log.levels.INFO)
-    end
-  end)
-end
-
-function M.save()
-  local history_file = file_io.get_data_file_path('luxterm_history.json')
-  local data = {
-    history = history,
-    current_index = current_index
-  }
-  
-  file_io.save_json_async(history_file, data)
-end
-
-function M.load()
-  local history_file = file_io.get_data_file_path('luxterm_history.json')
-  
-  file_io.load_json_async(history_file, function(parsed_data)
-    if parsed_data then
-      history = parsed_data.history or {}
-      current_index = parsed_data.current_index or {}
-    end
-  end)
-end
-
-function M.clear(terminal_name)
-  if terminal_name then
-    history[terminal_name] = {}
-    current_index[terminal_name] = 0
-  else
-    history = {}
-    current_index = {}
-  end
-  M.save()
-end
-
-function M.get_history(terminal_name)
-  return history[terminal_name] or {}
-end
+M.export_history = io.export_history
+M.import_history = io.import_history
+M.save = io.save
+M.load = io.load
 
 return M

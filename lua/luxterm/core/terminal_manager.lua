@@ -15,7 +15,7 @@ function M.create(name, options)
   options = options or {}
   
   return common.safe_operation(function()
-    local buffer_service = require('luxterm.services.buffer_service')
+    local buffer_service = require('luxterm.terminal.creation')
     local session = require('luxterm.session')
     
     local terminals = session.get_terminals()
@@ -37,14 +37,14 @@ function M.show(name)
   name = common.get_default_name(name)
   
   return common.with_terminal_info(name, function(terminal_info)
-    local window_service = require('luxterm.services.window_service')
+    local window_service = require('luxterm.terminal.display')
     return window_service.show_terminal(name, terminal_info)
   end)
 end
 
 function M.hide(name)
   name = common.get_default_name(name)
-  local window_service = require('luxterm.services.window_service')
+  local window_service = require('luxterm.terminal.display')
   return window_service.hide_terminal(name)
 end
 
@@ -95,7 +95,7 @@ end
 
 function M.is_visible(name)
   name = common.get_default_name(name)
-  local window_service = require('luxterm.services.window_service')
+  local window_service = require('luxterm.terminal.display')
   return window_service.is_terminal_visible(name)
 end
 
@@ -107,19 +107,19 @@ end
 
 function M.focus(name)
   name = common.get_default_name(name)
-  local window_service = require('luxterm.services.window_service')
+  local window_service = require('luxterm.terminal.display')
   return window_service.focus_terminal(name)
 end
 
 function M.resize(name, size)
   name = common.get_default_name(name)
-  local window_service = require('luxterm.services.window_service')
+  local window_service = require('luxterm.terminal.display')
   return window_service.resize_terminal(name, size)
 end
 
 function M.change_position(name, position)
   name = common.get_default_name(name)
-  local window_service = require('luxterm.services.window_service')
+  local window_service = require('luxterm.terminal.display')
   return window_service.change_terminal_position(name, position)
 end
 
@@ -138,7 +138,7 @@ function M.rename(old_name, new_name)
     terminal_info.terminal_name = new_name
     session.add_terminal(new_name, terminal_info)
     
-    local buffer_service = require('luxterm.services.buffer_service')
+    local buffer_service = require('luxterm.terminal.creation')
     buffer_service.update_terminal_name(terminal_info.bufnr, new_name)
     
     return true
