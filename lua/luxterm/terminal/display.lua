@@ -28,7 +28,7 @@ function M.show_floating(name, terminal_info)
   return common.with_config({
     'floating_width', 'floating_height', 'floating_border'
   }, function(config_values)
-    local win_id = window_utils.create_window(terminal_info.bufnr, 'floating')
+    local win_id = window_utils.create_window(terminal_info.bufnr, 'floating', name)
     
     if not win_id then
       common.notify_error('Failed to create floating window', 'Window')

@@ -21,11 +21,14 @@ function M.open_floating(terminal_name, buffer_info)
     col = col,
     style = 'minimal',
     border = border,
-    title = ' Terminal: ' .. terminal_name .. ' ',
-    title_pos = 'center',
     focusable = true,
     zindex = 1000
   }
+  
+  if vim.fn.has('nvim-0.9.0') == 1 then
+    opts.title = ' Terminal: ' .. terminal_name .. ' '
+    opts.title_pos = 'center'
+  end
   
   require('luxterm.window.utils').store_previous_window()
   

@@ -59,7 +59,7 @@ function M.notify_info(message, context)
 end
 
 function M.get_default_name(name, fallback)
-  return name and name ~= '' and name or fallback or 'default'
+  return name and name ~= '' and name or fallback or 'main'
 end
 
 function M.validate_args(args, required)

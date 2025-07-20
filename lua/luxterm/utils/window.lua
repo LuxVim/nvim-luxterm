@@ -52,8 +52,14 @@ function M.get_window_config(config_type)
   return configs[config_type] or configs.floating
 end
 
-function M.create_window(bufnr, config_type)
+function M.create_window(bufnr, config_type, terminal_name)
   local config = M.get_window_config(config_type or 'floating')
+  
+  -- Add title for floating windows if terminal name is provided
+  if config_type == 'floating' and terminal_name and vim.fn.has('nvim-0.9.0') == 1 then
+    config.title = ' Terminal: ' .. terminal_name .. ' '
+    config.title_pos = 'center'
+  end
   
   local win_id
   if config.split then

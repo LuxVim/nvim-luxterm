@@ -64,14 +64,11 @@ function M.print_status()
 end
 
 function M.init()
-  -- Initialize luxterm
   return terminal_manager.init()
 end
 
 function M.setup(opts)
-  -- Setup function for nvim-luxterm configuration
   opts = opts or {}
-  -- Configuration can be handled here if needed
   return M
 end
 
