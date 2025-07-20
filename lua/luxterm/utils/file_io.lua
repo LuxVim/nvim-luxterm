@@ -10,28 +10,30 @@ end
 function M.save_json_async(file_path, data, callback)
   M.ensure_directory(file_path)
   
-  local json_data = vim.fn.json_encode(data)
-  if not json_data then
-    vim.notify('LuxTerm: Failed to encode data', vim.log.levels.WARN)
-    if callback then callback(false) end
-    return
-  end
-  
-  vim.uv.fs_open(file_path, 'w', 438, function(err, fd)
-    if err or not fd then
-      vim.notify('LuxTerm: Failed to open file: ' .. (err or 'unknown'), vim.log.levels.WARN)
+  vim.schedule(function()
+    local ok, json_data = pcall(vim.fn.json_encode, data)
+    if not ok or not json_data then
+      vim.notify('LuxTerm: Failed to encode data', vim.log.levels.WARN)
       if callback then callback(false) end
       return
     end
     
-    vim.uv.fs_write(fd, json_data, -1, function(write_err)
-      vim.uv.fs_close(fd, function() end)
-      if write_err then
-        vim.notify('LuxTerm: Failed to save: ' .. write_err, vim.log.levels.WARN)
+    vim.uv.fs_open(file_path, 'w', 438, function(err, fd)
+      if err or not fd then
+        vim.notify('LuxTerm: Failed to open file: ' .. (err or 'unknown'), vim.log.levels.WARN)
         if callback then callback(false) end
-      else
-        if callback then callback(true) end
+        return
       end
+      
+      vim.uv.fs_write(fd, json_data, -1, function(write_err)
+        vim.uv.fs_close(fd, function() end)
+        if write_err then
+          vim.notify('LuxTerm: Failed to save: ' .. write_err, vim.log.levels.WARN)
+          if callback then callback(false) end
+        else
+          if callback then callback(true) end
+        end
+      end)
     end)
   end)
 end
@@ -64,8 +66,14 @@ function M.load_json_async(file_path, callback)
           return
         end
         
-        local decoded_data = vim.fn.json_decode(data)
-        if callback then callback(decoded_data) end
+        vim.schedule(function()
+          local ok, decoded_data = pcall(vim.fn.json_decode, data)
+          if ok and decoded_data then
+            if callback then callback(decoded_data) end
+          else
+            if callback then callback(nil) end
+          end
+        end)
       end)
     end)
   end)

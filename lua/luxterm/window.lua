@@ -65,12 +65,21 @@ function M.open_floating(terminal_name, buffer_info)
     style = 'minimal',
     border = border,
     title = ' Terminal: ' .. terminal_name .. ' ',
-    title_pos = 'center'
+    title_pos = 'center',
+    focusable = true,
+    zindex = 1000  -- Ensure it appears above other windows
   }
   
   M.store_previous_window()
   
+  -- Ensure we're creating a floating window, not modifying existing one
   local win_id = vim.api.nvim_open_win(buffer_info.bufnr, true, opts)
+  
+  -- Verify the window was created successfully and is floating
+  if not win_id or not vim.api.nvim_win_is_valid(win_id) then
+    vim.notify('LuxTerm: Failed to create floating window', vim.log.levels.ERROR)
+    return nil
+  end
   
   floating_windows[terminal_name] = {
     win_id = win_id,
@@ -228,7 +237,15 @@ end
 
 function M.store_previous_window()
   local current_win = vim.api.nvim_get_current_win()
-  vim.w.luxterm_previous_win = current_win
+  local buffer_detect = require('luxterm.utils.buffer_detect')
+  
+  if buffer_detect.is_suitable_previous_window(current_win) then
+    vim.w.luxterm_previous_win = current_win
+  else
+    -- Find a suitable window to return to
+    local suitable_win = buffer_detect.find_suitable_previous_window(current_win)
+    vim.w.luxterm_previous_win = suitable_win
+  end
 end
 
 function M.restore_previous_window()

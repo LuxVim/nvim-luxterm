@@ -48,11 +48,13 @@ local build_systems = {
   python = {
     files = { 'setup.py', 'pyproject.toml', 'requirements.txt' },
     config = function(cwd)
+      local ok, dir_name = pcall(vim.fn.fnamemodify, cwd, ':t')
+      local project_name = ok and dir_name or 'main'
       return {
         type = 'python',
         build_cmd = 'python setup.py build',
         dev_cmd = 'python -m pip install -e .',
-        start_cmd = 'python -m ' .. vim.fn.fnamemodify(cwd, ':t'),
+        start_cmd = 'python -m ' .. project_name,
         install_cmd = 'pip install -e .',
         test_cmd = 'python -m pytest'
       }
@@ -61,11 +63,15 @@ local build_systems = {
 }
 
 local function file_exists(path)
-  return vim.fn.filereadable(path) == 1
+  local ok, result = pcall(vim.fn.filereadable, path)
+  return ok and result == 1
 end
 
 function M.detect(cwd)
-  cwd = cwd or vim.fn.getcwd()
+  if not cwd then
+    local ok, result = pcall(vim.fn.getcwd)
+    cwd = ok and result or '.'
+  end
   
   for name, system in pairs(build_systems) do
     for _, file in ipairs(system.files) do

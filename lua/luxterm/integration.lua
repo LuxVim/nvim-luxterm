@@ -14,103 +14,17 @@ function M.init()
 end
 
 function M.detect_build_system()
-  local cwd = vim.fn.getcwd()
-  
-  if vim.fn.filereadable(cwd .. '/package.json') == 1 then
-    integrations.build = {
-      type = 'npm',
-      build_cmd = 'npm run build',
-      dev_cmd = 'npm run dev',
-      start_cmd = 'npm start',
-      install_cmd = 'npm install'
-    }
-  elseif vim.fn.filereadable(cwd .. '/Cargo.toml') == 1 then
-    integrations.build = {
-      type = 'cargo',
-      build_cmd = 'cargo build',
-      dev_cmd = 'cargo run',
-      start_cmd = 'cargo run --release',
-      install_cmd = 'cargo install'
-    }
-  elseif vim.fn.filereadable(cwd .. '/go.mod') == 1 then
-    integrations.build = {
-      type = 'go',
-      build_cmd = 'go build',
-      dev_cmd = 'go run .',
-      start_cmd = 'go run .',
-      install_cmd = 'go mod tidy'
-    }
-  elseif vim.fn.filereadable(cwd .. '/Makefile') == 1 or vim.fn.filereadable(cwd .. '/makefile') == 1 then
-    integrations.build = {
-      type = 'make',
-      build_cmd = 'make',
-      dev_cmd = 'make dev',
-      start_cmd = 'make run',
-      install_cmd = 'make install'
-    }
-  elseif vim.fn.filereadable(cwd .. '/setup.py') == 1 or vim.fn.filereadable(cwd .. '/pyproject.toml') == 1 then
-    integrations.build = {
-      type = 'python',
-      build_cmd = 'python setup.py build',
-      dev_cmd = 'python -m pip install -e .',
-      start_cmd = 'python -m ' .. vim.fn.fnamemodify(cwd, ':t'),
-      install_cmd = 'pip install -e .'
-    }
-  else
-    integrations.build = {
-      type = 'generic',
-      build_cmd = 'make',
-      dev_cmd = './run.sh',
-      start_cmd = './start.sh',
-      install_cmd = './install.sh'
-    }
-  end
+  vim.schedule(function()
+    local build_systems = require('luxterm.integrations.build_systems')
+    integrations.build = build_systems.detect()
+  end)
 end
 
 function M.detect_test_framework()
-  local cwd = vim.fn.getcwd()
-  
-  if vim.fn.filereadable(cwd .. '/package.json') == 1 then
-    integrations.test = {
-      type = 'npm',
-      test_cmd = 'npm test',
-      test_verbose_cmd = 'npm test -- --verbose',
-      test_watch_cmd = 'npm run test:watch',
-      coverage_cmd = 'npm run test:coverage'
-    }
-  elseif vim.fn.filereadable(cwd .. '/Cargo.toml') == 1 then
-    integrations.test = {
-      type = 'cargo',
-      test_cmd = 'cargo test',
-      test_verbose_cmd = 'cargo test -- --nocapture',
-      test_watch_cmd = 'cargo watch -x test',
-      coverage_cmd = 'cargo tarpaulin'
-    }
-  elseif vim.fn.filereadable(cwd .. '/go.mod') == 1 then
-    integrations.test = {
-      type = 'go',
-      test_cmd = 'go test ./...',
-      test_verbose_cmd = 'go test -v ./...',
-      test_watch_cmd = 'go test -watch ./...',
-      coverage_cmd = 'go test -cover ./...'
-    }
-  elseif vim.fn.glob(cwd .. '/**/test_*.py') ~= '' or vim.fn.glob(cwd .. '/**/*_test.py') ~= '' then
-    integrations.test = {
-      type = 'pytest',
-      test_cmd = 'pytest',
-      test_verbose_cmd = 'pytest -v',
-      test_watch_cmd = 'pytest --watch',
-      coverage_cmd = 'pytest --cov'
-    }
-  else
-    integrations.test = {
-      type = 'generic',
-      test_cmd = 'make test',
-      test_verbose_cmd = 'make test-verbose',
-      test_watch_cmd = 'make test-watch',
-      coverage_cmd = 'make coverage'
-    }
-  end
+  vim.schedule(function()
+    local test_frameworks = require('luxterm.integrations.test_frameworks')
+    integrations.test = test_frameworks.detect()
+  end)
 end
 
 function M.run_command(category, command, terminal_name)

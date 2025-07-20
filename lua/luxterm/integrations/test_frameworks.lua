@@ -70,15 +70,20 @@ local test_frameworks = {
 }
 
 local function file_exists(path)
-  return vim.fn.filereadable(path) == 1
+  local ok, result = pcall(vim.fn.filereadable, path)
+  return ok and result == 1
 end
 
 local function pattern_exists(cwd, pattern)
-  return vim.fn.glob(cwd .. pattern) ~= ''
+  local ok, result = pcall(vim.fn.glob, cwd .. pattern)
+  return ok and result ~= ''
 end
 
 function M.detect(cwd)
-  cwd = cwd or vim.fn.getcwd()
+  if not cwd then
+    local ok, result = pcall(vim.fn.getcwd)
+    cwd = ok and result or '.'
+  end
   
   for name, framework in pairs(test_frameworks) do
     local matches = false

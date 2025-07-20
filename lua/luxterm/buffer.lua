@@ -29,25 +29,59 @@ function M.create_terminal(terminal_name)
   local shell = vim.o.shell
   local bufnr = vim.api.nvim_create_buf(false, true)
   
-  -- Save current buffer and temporarily switch to terminal buffer
+  -- Save current window and buffer context
   local original_buf = vim.api.nvim_get_current_buf()
+  local original_win = vim.api.nvim_get_current_win()
+  local buffer_detect = require('luxterm.utils.buffer_detect')
   
-  -- Check if current buffer is special (nvim-tree, etc) and handle appropriately
-  local current_bt = vim.bo[original_buf].buftype
-  local current_ft = vim.bo[original_buf].filetype
+  -- Check if we're in a special buffer that shouldn't be modified
+  local is_special_buffer = buffer_detect.is_special_buffer(original_buf)
   
-  vim.api.nvim_set_current_buf(bufnr)
+  local chanid
   
-  local chanid = vim.fn.termopen(shell, {
-    cwd = cwd,
-    on_exit = function(job_id, exit_code, event_type)
-      M.on_terminal_exit(terminal_name, job_id, exit_code, event_type)
+  if is_special_buffer then
+    -- For special buffers, create terminal without switching current buffer
+    -- We'll create a temporary scratch window to run termopen
+    local temp_win = vim.api.nvim_open_win(bufnr, false, {
+      relative = 'editor',
+      width = 1,
+      height = 1,
+      row = 0,
+      col = 0,
+      style = 'minimal',
+      focusable = false
+    })
+    
+    vim.api.nvim_win_set_buf(temp_win, bufnr)
+    
+    vim.api.nvim_win_call(temp_win, function()
+      chanid = vim.fn.termopen(shell, {
+        cwd = cwd,
+        on_exit = function(job_id, exit_code, event_type)
+          M.on_terminal_exit(terminal_name, job_id, exit_code, event_type)
+        end
+      })
+    end)
+    
+    -- Close the temporary window
+    if vim.api.nvim_win_is_valid(temp_win) then
+      vim.api.nvim_win_close(temp_win, true)
     end
-  })
-  
-  -- Always restore original buffer to prevent terminal appearing in current buffer
-  if vim.api.nvim_buf_is_valid(original_buf) then
-    vim.api.nvim_set_current_buf(original_buf)
+  else
+    -- For normal buffers, use the existing method
+    vim.api.nvim_set_current_buf(bufnr)
+    
+    chanid = vim.fn.termopen(shell, {
+      cwd = cwd,
+      on_exit = function(job_id, exit_code, event_type)
+        M.on_terminal_exit(terminal_name, job_id, exit_code, event_type)
+      end
+    })
+    
+    -- Restore original buffer
+    if vim.api.nvim_buf_is_valid(original_buf) then
+      vim.api.nvim_set_current_buf(original_buf)
+    end
   end
   
   if chanid <= 0 then
