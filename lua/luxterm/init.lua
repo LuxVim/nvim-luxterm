@@ -1,151 +1,78 @@
+local terminal_manager = require('luxterm.core.terminal_manager')
+local info_provider = require('luxterm.services.info_provider')
+
 local M = {}
 
-local config = require('luxterm.config')
-local session = require('luxterm.session')
-local history = require('luxterm.history')
-local integration = require('luxterm.integration')
-local statusline = require('luxterm.statusline')
-local terminal = require('luxterm.terminal')
-
-function M.setup(opts)
-  return require('luxterm.setup').setup(opts)
+function M.toggle(name)
+  return terminal_manager.toggle(name)
 end
 
-function M.init()
-  config.init()
-  session.init()
-  history.init()
-  integration.init()
-  statusline.init()
-  
-  local augroup = vim.api.nvim_create_augroup('luxterm_auto_session', { clear = true })
-  
-  vim.api.nvim_create_autocmd('VimEnter', {
-    group = augroup,
-    callback = function()
-      session.switch_to_project()
-    end
-  })
-  
-  vim.api.nvim_create_autocmd('VimLeave', {
-    group = augroup,
-    callback = function()
-      session.save()
-    end
-  })
-  
-  vim.api.nvim_create_autocmd('BufEnter', {
-    group = augroup,
-    callback = function()
-      if vim.bo.buftype == 'terminal' then
-        session.clean()
-      end
-    end
-  })
+function M.show(name)
+  return terminal_manager.show(name)
 end
 
-function M.toggle(terminal_name)
-  terminal_name = terminal_name or 'default'
-  
-  if terminal.is_active(terminal_name) then
-    terminal.hide(terminal_name)
-  else
-    terminal.show(terminal_name)
-  end
+function M.hide(name)
+  return terminal_manager.hide(name)
 end
 
-function M.send_command(terminal_name, command)
-  local terminals = session.get_terminals()
-  
-  if not terminals[terminal_name] then
-    M.toggle(terminal_name)
-    terminals = session.get_terminals()
-  end
-  
-  local buffer_info = terminals[terminal_name]
-  
-  if not terminal.is_active(terminal_name) then
-    terminal.show(terminal_name)
-  end
-  
-  if buffer_info.bufnr and vim.api.nvim_buf_is_valid(buffer_info.bufnr) then
-    vim.api.nvim_chan_send(buffer_info.chanid, command .. '\n')
-    history.add_entry(terminal_name, command, vim.fn.getcwd())
-  end
+function M.send_command(name, command, options)
+  return terminal_manager.send_command(name, command, options)
 end
 
-function M.list()
-  local terminals = session.get_terminals()
-  local result = {}
-  
-  for name, info in pairs(terminals) do
-    local active = terminal.is_active(name) and '*' or ' '
-    local bufnr = info.bufnr or -1
-    local position = info.position or 'unknown'
-    table.insert(result, string.format('%s %-15s (buf:%d, pos:%s)', active, name, bufnr, position))
-  end
-  
-  return result
+function M.close(name)
+  return terminal_manager.close(name)
 end
 
-function M.kill(terminal_name)
-  local terminals = session.get_terminals()
-  
-  if terminals[terminal_name] then
-    local buffer_info = terminals[terminal_name]
-    
-    if terminal.is_active(terminal_name) then
-      terminal.hide(terminal_name)
-    end
-    
-    if buffer_info.bufnr and vim.api.nvim_buf_is_valid(buffer_info.bufnr) then
-      vim.api.nvim_buf_delete(buffer_info.bufnr, { force = true })
-    end
-    
-    session.remove_terminal(terminal_name)
-  end
+function M.focus(name)
+  return terminal_manager.focus(name)
+end
+
+function M.resize(name, size)
+  return terminal_manager.resize(name, size)
+end
+
+function M.change_position(name, position)
+  return terminal_manager.change_position(name, position)
 end
 
 function M.rename(old_name, new_name)
-  local terminals = session.get_terminals()
-  
-  if terminals[old_name] and not terminals[new_name] then
-    local buffer_info = terminals[old_name]
-    session.remove_terminal(old_name)
-    session.add_terminal(new_name, buffer_info)
-  end
+  return terminal_manager.rename(old_name, new_name)
+end
+
+function M.list()
+  return terminal_manager.list()
 end
 
 function M.next_terminal()
-  local terminals = vim.tbl_keys(session.get_terminals())
-  local current = session.get_last_terminal()
-  
-  if #terminals == 0 then
-    return
-  end
-  
-  local index = vim.tbl_contains(terminals, current) and 
-    vim.fn.index(terminals, current) + 1 or 1
-  local next_index = (index % #terminals) + 1
-  local next_terminal = terminals[next_index]
-  
-  M.toggle(next_terminal)
+  return terminal_manager.navigate('next')
 end
 
 function M.prev_terminal()
-  local terminals = vim.tbl_keys(session.get_terminals())
-  local current = session.get_last_terminal()
-  
-  if #terminals == 0 then
-    return
-  end
-  
-  local index = vim.tbl_contains(terminals, current) and 
-    vim.fn.index(terminals, current) + 1 or 1
-  local prev_index = ((index - 2) % #terminals) + 1
-  local prev_terminal = terminals[prev_index]
-  
-  M.toggle(prev_terminal)
+  return terminal_manager.navigate('prev')
+end
+
+function M.get_status(name)
+  return info_provider.get_terminal_status(name)
+end
+
+function M.get_statusline_string()
+  return info_provider.get_statusline_string()
+end
+
+function M.print_status()
+  print(info_provider.format_terminal_list())
+end
+
+function M.init()
+  -- Initialize luxterm
+  return terminal_manager.init()
+end
+
+function M.setup(opts)
+  -- Setup function for nvim-luxterm configuration
+  opts = opts or {}
+  -- Configuration can be handled here if needed
+  return M
 end
 
 return M

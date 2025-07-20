@@ -1,148 +1,40 @@
+local info_provider = require('luxterm.services.info_provider')
+
 local M = {}
 
-local config = require('luxterm.config')
-
-function M.init()
-  if config.get('statusline_integration') then
-    M.setup_integrations()
-  end
-end
-
-function M.get_info()
-  local session = require('luxterm.session')
-  local terminals = session.get_terminals()
-  local current_session = session.get_current()
-  local last_terminal = session.get_last_terminal()
-  
-  local active_count = 0
-  local terminal_names = {}
-  
-  for name, info in pairs(terminals) do
-    if info.bufnr and vim.api.nvim_buf_is_valid(info.bufnr) then
-      active_count = active_count + 1
-      table.insert(terminal_names, name)
-    end
-  end
-  
-  return {
-    session = current_session,
-    active_count = active_count,
-    terminal_names = terminal_names,
-    last_terminal = last_terminal,
-    total_count = vim.tbl_count(terminals)
-  }
-end
-
-function M.get_status_string()
-  local info = M.get_info()
-  
-  if info.active_count == 0 then
-    return ''
-  end
-  
-  return string.format('[T:%s(%d)]', info.session, info.active_count)
+function M.get_string()
+    return info_provider.get_statusline_string()
 end
 
 function M.get_compact_string()
-  local info = M.get_info()
-  
-  if info.active_count == 0 then
-    return ''
-  end
-  
-  if info.active_count == 1 then
-    return string.format('T:%s', info.last_terminal)
-  else
-    return string.format('T:%d', info.active_count)
-  end
-end
-
-function M.get_detailed_string()
-  local info = M.get_info()
-  
-  if info.active_count == 0 then
-    return 'No terminals'
-  end
-  
-  local names = table.concat(info.terminal_names, ', ')
-  return string.format('Session: %s | Terminals: %s', info.session, names)
+    return info_provider.get_statusline_string()
 end
 
 function M.setup_integrations()
-  local airline = require('luxterm.integrations.statusline.airline')
-  local lightline = require('luxterm.integrations.statusline.lightline')
+    local airline = require('luxterm.integrations.statusline.airline')
+    local lightline = require('luxterm.integrations.statusline.lightline')
   
-  if airline.is_available() then
-    airline.setup()
-  end
+    if airline.is_available() then
+        airline.setup()
+    end
   
-  if lightline.is_available() then
-    lightline.setup()
-  end
+    if lightline.is_available() then
+        lightline.setup()
+    end
 end
 
 function M.airline_integration()
-  local airline = require('luxterm.integrations.statusline.airline')
-  return airline.setup()
+    local airline = require('luxterm.integrations.statusline.airline')
+    return airline.setup()
 end
 
 function M.lightline_integration()
-  local lightline = require('luxterm.integrations.statusline.lightline')
-  return lightline.setup()
+    local lightline = require('luxterm.integrations.statusline.lightline')
+    return lightline.setup()
 end
 
 function M.get_terminal_status(terminal_name)
-  local session = require('luxterm.session')
-  local terminals = session.get_terminals()
-  local terminal = require('luxterm.terminal')
-  
-  if not terminals[terminal_name] then
-    return 'inactive'
-  end
-  
-  local info = terminals[terminal_name]
-  if not info.bufnr or not vim.api.nvim_buf_is_valid(info.bufnr) then
-    return 'invalid'
-  end
-  
-  if terminal.is_active(terminal_name) then
-    return 'active'
-  else
-    return 'hidden'
-  end
-end
-
-function M.get_terminal_info(terminal_name)
-  local session = require('luxterm.session')
-  local terminals = session.get_terminals()
-  
-  if not terminals[terminal_name] then
-    return nil
-  end
-  
-  local info = terminals[terminal_name]
-  return {
-    name = terminal_name,
-    bufnr = info.bufnr,
-    position = info.position,
-    size = info.size,
-    status = M.get_terminal_status(terminal_name)
-  }
-end
-
-function M.get_all_terminals_info()
-  local session = require('luxterm.session')
-  local terminals = session.get_terminals()
-  local result = {}
-  
-  for name, _ in pairs(terminals) do
-    local info = M.get_terminal_info(name)
-    if info then
-      table.insert(result, info)
-    end
-  end
-  
-  return result
+    return info_provider.get_terminal_status(terminal_name)
 end
 
 return M

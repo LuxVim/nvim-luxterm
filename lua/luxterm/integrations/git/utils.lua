@@ -8,7 +8,12 @@ end
 
 function M.send_git_command(command, terminal_name)
   terminal_name = M.get_default_terminal_name(terminal_name)
-  require('luxterm').send_command(terminal_name, command)
+  vim.notify('LuxTerm: Sending command "' .. command .. '" to terminal "' .. terminal_name .. '"', vim.log.levels.INFO)
+  local terminal_manager = require('luxterm.core.terminal_manager')
+  local result = terminal_manager.send_command(terminal_name, command, { show_terminal = true })
+  if not result then
+    vim.notify('LuxTerm: Failed to send command', vim.log.levels.WARN)
+  end
 end
 
 function M.validate_args(args, required_args)

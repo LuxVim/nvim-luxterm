@@ -19,7 +19,7 @@ function M.run(args, terminal_name)
     pretty = args.pretty,
     format = args.format,
     since = args.since,
-    until = args.until,
+    ['until'] = args['until'],
     author = args.author,
     grep = args.grep,
     ['follow'] = args.follow
