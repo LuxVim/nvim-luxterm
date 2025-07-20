@@ -17,7 +17,7 @@ function M.setup_window(win_id, terminal_name, buffer_info)
   vim.api.nvim_create_autocmd('WinClosed', {
     pattern = tostring(win_id),
     callback = function()
-      require('luxterm.window.management').on_window_closed(terminal_name, win_id)
+      require('luxterm.terminal.display').on_window_closed(terminal_name, win_id)
     end,
     once = true
   })

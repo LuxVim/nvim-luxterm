@@ -12,21 +12,6 @@ function M.configure_terminal_window(win_id)
   vim.wo[win_id].wrap = false
 end
 
-function M.store_previous_window()
-  local current_win = vim.api.nvim_get_current_win()
-  if current_win then
-    vim.b.luxterm_previous_win = current_win
-  end
-end
-
-function M.restore_previous_window()
-  local previous_win = vim.b.luxterm_previous_win
-  if previous_win and vim.api.nvim_win_is_valid(previous_win) then
-    vim.api.nvim_set_current_win(previous_win)
-    return true
-  end
-  return false
-end
 
 function M.get_window_config(config_type)
   local configs = {

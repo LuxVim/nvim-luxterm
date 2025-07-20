@@ -1,21 +1,21 @@
 local M = {}
 
-local window = require('luxterm.window')
+local display = require('luxterm.terminal.display')
 local buffer = require('luxterm.buffer')
 
 function M.show(terminal_name)
     local buffer_info = buffer.get(terminal_name)
     if buffer_info then
-        window.open(terminal_name, buffer_info)
+        display.show_terminal(terminal_name, buffer_info)
     end
 end
 
 function M.hide(terminal_name)
-    window.close(terminal_name)
+    display.hide_terminal(terminal_name)
 end
 
 function M.is_active(terminal_name)
-    return window.is_active(terminal_name)
+    return display.is_terminal_visible(terminal_name)
 end
 
 function M.close(terminal_name)

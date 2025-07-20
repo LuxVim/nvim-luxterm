@@ -21,15 +21,6 @@ local function luxterm_list()
   end
 end
 
-local function luxterm_kill(args)
-  local terminal_name = args.args
-  if terminal_name and terminal_name ~= '' then
-    require('luxterm').kill(terminal_name)
-    print('Killed terminal: ' .. terminal_name)
-  else
-    print('Error: Terminal name required')
-  end
-end
 
 local function luxterm_rename(args)
   local names = vim.split(args.args, '%s+')
@@ -80,7 +71,7 @@ local function luxterm_resize(args)
     local terminal_name = parts[1]
     local size = tonumber(parts[2])
     if size then
-      require('luxterm.window').resize(terminal_name, size)
+      require('luxterm.terminal.display').resize_terminal(terminal_name, size)
       print('Resized terminal ' .. terminal_name .. ' to size: ' .. size)
     else
       print('Error: Size must be a number')
@@ -121,7 +112,6 @@ end
 
 vim.api.nvim_create_user_command('LuxTerm', luxterm_toggle, { nargs = '?' })
 vim.api.nvim_create_user_command('LuxTermList', luxterm_list, { nargs = 0 })
-vim.api.nvim_create_user_command('LuxTermKill', luxterm_kill, { nargs = 1 })
 vim.api.nvim_create_user_command('LuxTermRename', luxterm_rename, { nargs = '+' })
 vim.api.nvim_create_user_command('LuxTermNext', luxterm_next, { nargs = 0 })
 vim.api.nvim_create_user_command('LuxTermPrev', luxterm_prev, { nargs = 0 })
@@ -142,12 +132,9 @@ vim.api.nvim_create_user_command('LuxTermGitPull', function() integration.git_pu
 vim.api.nvim_create_user_command('LuxTermGitLog', function() integration.git_log() end, { nargs = 0 })
 vim.api.nvim_create_user_command('LuxTermGitDiff', function() integration.git_diff() end, { nargs = 0 })
 vim.api.nvim_create_user_command('LuxTermBuild', function() integration.build() end, { nargs = 0 })
-vim.api.nvim_create_user_command('LuxTermRun', function() integration.run() end, { nargs = 0 })
 vim.api.nvim_create_user_command('LuxTermTest', function() integration.test() end, { nargs = 0 })
 vim.api.nvim_create_user_command('LuxTermTestVerbose', function() integration.test_verbose() end, { nargs = 0 })
 vim.api.nvim_create_user_command('LuxTermCoverage', function() integration.coverage() end, { nargs = 0 })
-vim.api.nvim_create_user_command('LuxTermSendLine', function() integration.send_current_line() end, { nargs = 0 })
-vim.api.nvim_create_user_command('LuxTermSendSelection', function() integration.send_selection() end, { range = true })
 
 local augroup = vim.api.nvim_create_augroup('luxterm_terminal_settings', { clear = true })
 

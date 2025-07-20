@@ -6,7 +6,7 @@ function M.open_split(terminal_name, buffer_info)
   local position = buffer_info.position or config.get('position')
   local size = buffer_info.size or config.get('size')
   
-  require('luxterm.window.utils').store_previous_window()
+  require('luxterm.terminal.display').store_previous_window()
   
   local position_map = config.get_position_map()
   local pos_info = position_map[position] or position_map['bottom']

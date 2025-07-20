@@ -26,7 +26,7 @@ function M.resize(terminal_name, size)
   local terminals = session.get_terminals()
   if terminals[terminal_name] then
     terminals[terminal_name].size = size
-    require('luxterm.window').resize(terminal_name, size)
+    require('luxterm.terminal.display').resize_terminal(terminal_name, size)
   end
 end
 
@@ -35,9 +35,9 @@ function M.change_position(terminal_name, position)
   if terminals[terminal_name] then
     terminals[terminal_name].position = position
     
-    if require('luxterm.window').is_active(terminal_name) then
-      require('luxterm.window').close(terminal_name)
-      require('luxterm.window').open(terminal_name, terminals[terminal_name])
+    if require('luxterm.terminal.display').is_terminal_visible(terminal_name) then
+      require('luxterm.terminal.display').hide_terminal(terminal_name)
+      require('luxterm.terminal.display').show_terminal(terminal_name, terminals[terminal_name])
     end
   end
 end
