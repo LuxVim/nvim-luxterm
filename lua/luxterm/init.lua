@@ -1,75 +1,51 @@
-local terminal_manager = require('luxterm.core.terminal_manager')
-local info_provider = require('luxterm.statusline.providers')
+local config = require("luxterm.config")
+local state = require("luxterm.state")
+local ui = require("luxterm.ui")
+local sessions = require("luxterm.sessions")
+local keymaps = require("luxterm.keymaps")
 
 local M = {}
 
-function M.toggle(name)
-  return terminal_manager.toggle(name)
+--- Setup plugin with user options
+-- @param user_config table
+function M.setup(user_config)
+  config.setup(user_config)
+
+  -- Register user commands
+  vim.api.nvim_create_user_command("LuxtermToggle", function()
+    M.toggle_manager()
+  end, {})
+
+  -- Setup global keymaps for terminal navigation
+  keymaps.setup_global_keymaps()
+
+  -- Autocommands for session tracking
+  vim.api.nvim_create_autocmd("TermOpen", {
+    callback = function() 
+      sessions.add_current_terminal()
+      keymaps.set_terminal_keymaps(vim.api.nvim_get_current_buf())
+    end
+  })
+
+  vim.api.nvim_create_autocmd("BufWipeout", {
+    callback = function() 
+      sessions.remove_closed_terminals() 
+    end
+  })
 end
 
-function M.show(name)
-  return terminal_manager.show(name)
-end
-
-function M.hide(name)
-  return terminal_manager.hide(name)
-end
-
-function M.send_command(name, command, options)
-  return terminal_manager.send_command(name, command, options)
-end
-
-function M.close(name)
-  return terminal_manager.close(name)
-end
-
-function M.focus(name)
-  return terminal_manager.focus(name)
-end
-
-function M.resize(name, size)
-  return terminal_manager.resize(name, size)
-end
-
-function M.change_position(name, position)
-  return terminal_manager.change_position(name, position)
-end
-
-function M.rename(old_name, new_name)
-  return terminal_manager.rename(old_name, new_name)
-end
-
-function M.list()
-  return terminal_manager.list()
-end
-
-function M.next_terminal()
-  return terminal_manager.navigate('next')
-end
-
-function M.prev_terminal()
-  return terminal_manager.navigate('prev')
-end
-
-function M.get_status(name)
-  return info_provider.get_terminal_status(name)
-end
-
-function M.get_statusline_string()
-  return info_provider.get_statusline_string()
-end
-
-function M.print_status()
-  print(info_provider.format_terminal_list())
-end
-
-function M.init()
-  return terminal_manager.init()
-end
-
-function M.setup(opts)
-  opts = opts or {}
-  return M
+--- Toggle the Luxterm UI
+function M.toggle_manager()
+  if state.is_manager_open() then
+    ui.close_manager()
+  else
+    -- Close any open session window first
+    local windows = state.get_windows()
+    if windows.manager and vim.api.nvim_win_is_valid(windows.manager) then
+      ui.close_session_window()
+    end
+    ui.open_manager()
+  end
 end
 
 return M
