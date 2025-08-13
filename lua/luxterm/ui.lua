@@ -434,7 +434,7 @@ function M.setup_focus_management()
     callback = function()
       if not state.is_manager_open() then
         if focus_autocmd then
-          vim.api.nvim_del_autocmd(focus_autocmd)
+          pcall(vim.api.nvim_del_autocmd, focus_autocmd)
         end
         return
       end
