@@ -10,11 +10,24 @@ local M = {}
 function M.execute(params)
   params = params or {}
   
+  -- Ensure we're not in terminal mode first
+  if vim.fn.mode() == 't' then
+    vim.cmd('stopinsert')
+  end
+  
+  -- If manager is already open, close it
   if layout_manager.is_manager_open() then
     return M._close_manager(params)
-  else
-    return M._open_manager(params)
   end
+  
+  -- Close any active session layout (but don't kill the session)
+  local active_layout = layout_manager.get_active_layout()
+  if active_layout and active_layout.type == "session" then
+    layout_manager.close_layout(active_layout.id)
+  end
+  
+  -- Always open the manager
+  return M._open_manager(params)
 end
 
 function M._open_manager(params)
@@ -32,6 +45,7 @@ function M._open_manager(params)
   
   local sessions = session_manager.get_all_sessions()
   local active_session = session_manager.get_active_session()
+  
   
   -- If no sessions exist, create a default one
   if #sessions == 0 then
@@ -51,6 +65,13 @@ function M._open_manager(params)
   
   M._setup_manager_components(layout, sessions, active_session)
   M._setup_manager_event_handlers(layout_id)
+  
+  -- Ensure the session list gets focus and forces a refresh
+  local session_list = require("luxterm.domains.ui.components.session_list")
+  if session_list.window_id and vim.api.nvim_win_is_valid(session_list.window_id) then
+    vim.api.nvim_set_current_win(session_list.window_id)
+    session_list.render()
+  end
   
   event_bus.emit(event_types.MANAGER_OPENED, {
     layout_id = layout_id,

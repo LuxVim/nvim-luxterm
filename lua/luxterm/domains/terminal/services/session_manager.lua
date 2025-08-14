@@ -56,7 +56,10 @@ function M.create_session(opts)
   local job_id = vim.fn.termopen(shell, term_opts)
   session.job_id = job_id
   
-  vim.api.nvim_set_current_buf(current_buf)
+  -- Only restore the current buffer if it's still valid
+  if vim.api.nvim_buf_is_valid(current_buf) then
+    vim.api.nvim_set_current_buf(current_buf)
+  end
   
   if not M.active_session_id then
     M.set_active_session(session_id)

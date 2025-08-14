@@ -163,13 +163,19 @@ function M._execute_single_operation(op)
   local args = op.args
   
   if op.operation == "buf_set_option" then
-    vim.api.nvim_buf_set_option(args.bufnr, args.name, args.value)
+    if vim.api.nvim_buf_is_valid(args.bufnr) then
+      vim.api.nvim_buf_set_option(args.bufnr, args.name, args.value)
+    end
   elseif op.operation == "win_set_option" then
-    vim.api.nvim_win_set_option(args.winid, args.name, args.value)
+    if vim.api.nvim_win_is_valid(args.winid) then
+      vim.api.nvim_win_set_option(args.winid, args.name, args.value)
+    end
   elseif op.operation == "set_hl" then
     vim.api.nvim_set_hl(args.ns_id, args.name, args.val)
   elseif op.operation == "buf_set_lines" then
-    vim.api.nvim_buf_set_lines(args.bufnr, args.start, args.end_, args.strict_indexing, args.replacement)
+    if vim.api.nvim_buf_is_valid(args.bufnr) then
+      vim.api.nvim_buf_set_lines(args.bufnr, args.start, args.end_, args.strict_indexing, args.replacement)
+    end
   end
 end
 

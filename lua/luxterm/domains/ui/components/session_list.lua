@@ -63,6 +63,8 @@ end
 function M.update_sessions(sessions, active_session_id)
   M.sessions_data = sessions or {}
   M.active_session_id = active_session_id
+  
+  
   M.render()
 end
 
@@ -75,6 +77,7 @@ function M.render()
   local lines = cache_coordinator.get_from_cache("session_list", cache_key, function()
     return M._generate_content()
   end)
+  
   
   floating_window.update_window_content(M.window_id, lines)
   return true
@@ -117,8 +120,18 @@ function M._add_session_list_content(lines)
   table.insert(lines, "")
   
   for i, session in ipairs(M.sessions_data) do
-    local line = M._format_session_line(session, i)
-    table.insert(lines, line)
+    local formatted_content = M._format_session_line(session, i)
+    
+    if type(formatted_content) == "table" then
+      -- Multi-line bordered display
+      for _, line in ipairs(formatted_content) do
+        table.insert(lines, line)
+      end
+      table.insert(lines, "") -- Add spacing between sessions
+    else
+      -- Single line fallback
+      table.insert(lines, formatted_content)
+    end
   end
   
   table.insert(lines, "")
@@ -130,13 +143,39 @@ function M._format_session_line(session, index)
   local name = M._truncate_name(session.name, M.render_config.max_name_length)
   local shortcut = string.format("[%d]", index)
   
-  -- Pad the name to the max length for consistent formatting
-  local padded_name = name .. string.rep(" ", math.max(0, M.render_config.max_name_length - #name))
-  
   if M.render_config.show_status then
-    return string.format("%s%s %s %s", prefix, status_icon, padded_name, shortcut)
+    -- Get actual status text
+    local status_text = "unknown"
+    if session.get_status then
+      status_text = session:get_status()
+    end
+    
+    -- Create bordered display with consistent width
+    local status_display = status_icon .. " " .. status_text
+    local hotkey_display = "Press " .. shortcut .. " to open"
+    
+    -- Use vim.fn.strdisplaywidth for proper terminal display width (handles emoji correctly)
+    local name_width = vim.fn.strdisplaywidth(name)
+    local status_width = vim.fn.strdisplaywidth(status_display)
+    local hotkey_width = vim.fn.strdisplaywidth(hotkey_display)
+    
+    -- Calculate consistent inner content width (the space inside borders)
+    local inner_width = math.max(name_width, status_width, hotkey_width)
+    
+    -- Build lines with consistent inner padding
+    local top_border = "╭ " .. name .. string.rep(" ", inner_width - name_width) .. " ╮"
+    local status_line = "│ " .. status_display .. string.rep(" ", inner_width - status_width) .. " │"
+    local hotkey_line = "│ " .. hotkey_display .. string.rep(" ", inner_width - hotkey_width) .. " │"
+    local bottom_border = "╰" .. string.rep("─", inner_width + 2) .. "╯"
+    
+    return {
+      prefix .. top_border,
+      prefix .. status_line,
+      prefix .. hotkey_line, 
+      prefix .. bottom_border
+    }
   else
-    return string.format("%s%s %s", prefix, padded_name, shortcut)
+    return prefix .. name .. " " .. shortcut
   end
 end
 

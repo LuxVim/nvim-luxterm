@@ -30,7 +30,7 @@ M.defaults = {
   },
   
   keymaps = {
-    toggle_manager = "<C-t>",
+    toggle_manager = "<C-/>",
     global_session_nav = true,
     next_session = "<C-Right>",
     prev_session = "<C-Left>",

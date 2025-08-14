@@ -13,9 +13,7 @@ local M = {
   content_watcher_id = nil,
   config = {
     max_lines = 50,
-    refresh_enabled = true,
-    show_header = true,
-    show_status = true
+    refresh_enabled = true
   }
 }
 
@@ -136,53 +134,11 @@ function M._generate_session_content()
   
   local lines = {}
   
-  if M.config.show_header then
-    M._add_header_content(lines)
-  end
-  
   M._add_terminal_content(lines)
-  
-  M._add_footer_content(lines)
   
   return lines
 end
 
-function M._add_header_content(lines)
-  -- Ensure we have a valid session before accessing its properties
-  if not M.current_session then
-    return
-  end
-  
-  local name = M.current_session.name or "Unknown Session"
-  local header_line = "╭─ " .. name .. " ─╮"
-  
-  table.insert(lines, "")
-  table.insert(lines, "  " .. header_line)
-  table.insert(lines, "  │")
-  
-  if M.config.show_status then
-    local status = "Unknown"
-    local status_icon = "⚫"
-    
-    if M.current_session.get_status then
-      status = M.current_session:get_status()
-      if status == "running" then
-        status_icon = "🟢"
-      elseif status == "stopped" then
-        status_icon = "🔴"
-      else
-        status_icon = "⚫"
-      end
-    end
-    
-    table.insert(lines, "  │  " .. status_icon .. " Status: " .. status)
-    table.insert(lines, "  │")
-  end
-  
-  local footer_line = "  ╰─" .. string.rep("─", #name) .. "─╯"
-  table.insert(lines, footer_line)
-  table.insert(lines, "")
-end
 
 function M._add_terminal_content(lines)
   local terminal_lines = {}
@@ -199,19 +155,17 @@ function M._add_terminal_content(lines)
   end
   
   if #terminal_lines == 0 or (#terminal_lines == 1 and terminal_lines[1] == "") then
-    table.insert(lines, "  [Empty terminal]")
-    table.insert(lines, "")
+    table.insert(lines, "[Empty terminal]")
   else
     local window_width = 80
     if M.window_id and vim.api.nvim_win_is_valid(M.window_id) then
-      window_width = vim.api.nvim_win_get_width(M.window_id) - 4
+      window_width = vim.api.nvim_win_get_width(M.window_id) - 2
     end
     
     for _, line in ipairs(terminal_lines) do
       local formatted_line = M._format_terminal_line(line, window_width)
-      table.insert(lines, "  " .. formatted_line)
+      table.insert(lines, formatted_line)
     end
-    table.insert(lines, "")
   end
 end
 
@@ -222,9 +176,6 @@ function M._format_terminal_line(line, max_width)
   return line
 end
 
-function M._add_footer_content(lines)
-  table.insert(lines, "  Press <Enter> to open • 'd' to delete")
-end
 
 function M._setup_content_watching()
   M._cleanup_timers()
