@@ -20,8 +20,10 @@ function M.execute(params)
     return M._close_manager(params)
   end
   
-  -- Close any active session layout (but don't kill the session)
+  -- Get the current active layout to check if it's a session
   local active_layout = layout_manager.get_active_layout()
+  
+  -- If we have an active session layout, close it before opening manager
   if active_layout and active_layout.type == "session" then
     layout_manager.close_layout(active_layout.id)
   end
@@ -59,10 +61,13 @@ function M._open_manager(params)
   M._setup_manager_event_handlers(layout_id)
   
   -- Ensure the session list gets focus and forces a refresh
-  local session_list = require("luxterm.domains.ui.components.session_list")
-  if session_list.window_id and vim.api.nvim_win_is_valid(session_list.window_id) then
-    vim.api.nvim_set_current_win(session_list.window_id)
-    session_list.render()
+  if layout and layout.windows and layout.windows.left and layout.windows.left.winid then
+    local left_winid = layout.windows.left.winid
+    if vim.api.nvim_win_is_valid(left_winid) then
+      vim.api.nvim_set_current_win(left_winid)
+      local session_list = require("luxterm.domains.ui.components.session_list")
+      session_list.render()
+    end
   end
   
   event_bus.emit(event_types.MANAGER_OPENED, {
