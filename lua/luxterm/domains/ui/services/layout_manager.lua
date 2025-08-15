@@ -48,14 +48,14 @@ function M.create_manager_layout(config)
     width_ratio = config.left_pane_width,
     enter = true,
     buffer_options = {
-      filetype = "luxterm-sessions"
+      filetype = "luxterm_main"
     }
   }
   
   local right_config = {
     title = " Preview ",
     buffer_options = {
-      filetype = "luxterm-preview"
+      filetype = "luxterm_preview"
     }
   }
   

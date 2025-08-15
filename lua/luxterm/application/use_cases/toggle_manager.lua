@@ -47,17 +47,9 @@ function M._open_manager(params)
   local active_session = session_manager.get_active_session()
   
   
-  -- If no sessions exist, create a default one
+  -- If no sessions exist, don't auto-create one - just show empty manager
   if #sessions == 0 then
-    local create_session_use_case = require("luxterm.application.use_cases.create_session")
-    local default_session, error_msg = create_session_use_case.execute({
-      name = "Terminal 1"
-    })
-    if default_session then
-      sessions = {default_session}
-      active_session = default_session
-      session_manager.set_active_session(default_session.id)
-    end
+    active_session = nil
   elseif #sessions > 0 and not active_session then
     session_manager.set_active_session(sessions[1].id)
     active_session = sessions[1]
@@ -172,7 +164,7 @@ function M._handle_ui_action(event_type, payload, layout_id)
   local switch_session_use_case = require("luxterm.application.use_cases.switch_session")
   
   if event_type == event_types.UI_ACTION_NEW_SESSION then
-    create_session_use_case.execute_and_open_floating()
+    create_session_use_case.execute()
     
   elseif event_type == event_types.UI_ACTION_DELETE_SESSION then
     delete_session_use_case.execute_active_session({ confirm = true })

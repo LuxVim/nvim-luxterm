@@ -67,7 +67,7 @@ function M._setup_buffer(bufnr, options)
     modifiable = false,
     buftype = "nofile",
     swapfile = false,
-    bufhidden = "wipe"
+    bufhidden = "hide"
   }
   
   local final_options = vim.tbl_deep_extend("force", default_options, options)

@@ -143,20 +143,19 @@ function Session:focus()
   return false
 end
 
-function Session:close()
-  if self:is_valid() then
-    event_bus.emit(event_types.SESSION_DELETED, {
-      session_id = self.id,
-      session = self
-    })
-    
+function Session:close(skip_buffer_delete)
+  event_bus.emit(event_types.SESSION_DELETED, {
+    session_id = self.id,
+    session = self
+  })
+  
+  if not skip_buffer_delete and self:is_valid() then
     pcall(function()
       vim.api.nvim_buf_delete(self.bufnr, { force = true })
     end)
-    
-    return true
   end
-  return false
+  
+  return true
 end
 
 function Session:update_metadata(key, value)

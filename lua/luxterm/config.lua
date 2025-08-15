@@ -5,7 +5,7 @@ M.defaults = {
   manager_height = 0.8,    -- Percentage of editor height
   preview_enabled = true,  -- Show live preview in right pane
   auto_close = false,      -- Auto close when switching to session
-  focus_on_create = true,  -- Focus terminal after creating session
+  focus_on_create = false, -- Focus terminal after creating session
   
   -- Window layout options
   border = "rounded",      -- Border style: "none", "single", "double", "rounded", "solid", "shadow"

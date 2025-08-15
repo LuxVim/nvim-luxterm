@@ -36,7 +36,7 @@ function M.create(config)
     title_pos = "center",
     enter = true,
     buffer_options = {
-      filetype = "luxterm-sessions"
+      filetype = "luxterm_main"
     },
     on_create = function(winid, bufnr)
       M.window_id = winid
@@ -108,16 +108,12 @@ function M._generate_content()
 end
 
 function M._add_empty_state_content(lines)
-  table.insert(lines, "")
   table.insert(lines, "  No sessions")
-  table.insert(lines, "")
-  table.insert(lines, "  Create your first session")
-  table.insert(lines, "  to get started")
   table.insert(lines, "")
 end
 
 function M._add_session_list_content(lines)
-  table.insert(lines, "")
+  -- table.insert(lines, "")
   
   for i, session in ipairs(M.sessions_data) do
     local formatted_content = M._format_session_line(session, i)
@@ -163,7 +159,7 @@ function M._format_session_line(session, index)
     local inner_width = math.max(name_width, status_width, hotkey_width)
     
     -- Build lines with consistent inner padding
-    local top_border = "╭ " .. name .. string.rep(" ", inner_width - name_width) .. " ╮"
+    local top_border = "╭ " .. name .. " " .. string.rep("─", inner_width - name_width -1) .. "─╮"
     local status_line = "│ " .. status_display .. string.rep(" ", inner_width - status_width) .. " │"
     local hotkey_line = "│ " .. hotkey_display .. string.rep(" ", inner_width - hotkey_width) .. " │"
     local bottom_border = "╰" .. string.rep("─", inner_width + 2) .. "╯"

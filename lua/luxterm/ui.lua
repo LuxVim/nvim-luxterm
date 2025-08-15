@@ -346,9 +346,11 @@ end
 
 --- Create a new session from the manager
 function M.create_new_session()
-  -- Create session with floating window behavior (close manager, open in floating window)
-  sessions.create_session(nil, true)
+  -- Create session without opening it, just refresh the layout to show it in the list
+  sessions.create_session(nil, false)
   cache.invalidate_session_list()
+  -- Refresh the manager to display the new session
+  M.render_manager()
 end
 
 --- Delete the active session

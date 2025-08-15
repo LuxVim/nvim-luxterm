@@ -86,13 +86,13 @@ function M._handle_terminal_exit(session_id, job_id, exit_code, event_type)
   end
 end
 
-function M.remove_session(session_id)
+function M.remove_session(session_id, skip_buffer_delete)
   local session = M.sessions[session_id]
   if not session then
     return false
   end
   
-  session:close()
+  session:close(skip_buffer_delete)
   M.sessions[session_id] = nil
   
   if M.active_session_id == session_id then
@@ -110,7 +110,7 @@ end
 function M._cleanup_session_by_bufnr(bufnr)
   for session_id, session in pairs(M.sessions) do
     if session.bufnr == bufnr then
-      M.remove_session(session_id)
+      M.remove_session(session_id, true)
       break
     end
   end

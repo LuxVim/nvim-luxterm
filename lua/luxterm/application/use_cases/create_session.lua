@@ -101,8 +101,7 @@ function M.execute_quick(name_suffix)
   end
   
   return M.execute({
-    name = name,
-    focus_on_create = true
+    name = name
   })
 end
 
@@ -113,7 +112,6 @@ function M.execute_from_current_directory()
   return M.execute({
     name = "Terminal (" .. dir_name .. ")",
     working_directory = cwd,
-    focus_on_create = true,
     metadata = {
       created_from_directory = cwd
     }
@@ -130,7 +128,6 @@ function M.execute_with_shell(shell_command, name)
   return M.execute({
     name = session_name,
     shell_command = shell_command,
-    focus_on_create = true,
     metadata = {
       custom_shell = shell_command
     }
