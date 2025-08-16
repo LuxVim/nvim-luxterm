@@ -111,6 +111,16 @@ function M.setup_autocmds()
     end
   })
   
+  -- Protect luxterm_main buffers from user modification
+  vim.api.nvim_create_autocmd("FileType", {
+    group = vim.api.nvim_create_augroup("LuxtermMainProtection", {clear = true}),
+    pattern = "luxterm_main",
+    callback = function(args)
+      -- Silently ensure luxterm_main buffers remain protected
+      vim.api.nvim_buf_set_option(args.buf, "modifiable", false)
+    end
+  })
+  
   -- Auto-refresh preview when terminal content changes
   vim.api.nvim_create_autocmd({"TextChanged", "TextChangedI", "TextChangedP"}, {
     group = vim.api.nvim_create_augroup("LuxtermContentUpdate", {clear = true}),

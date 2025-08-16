@@ -23,6 +23,41 @@ function M.setup(opts)
   M.setup_highlights()
 end
 
+function M.setup_buffer_protection()
+  if not M.buffer_id then return end
+  
+  -- Create autocmds to prevent any modification attempts
+  local augroup = vim.api.nvim_create_augroup("LuxtermMainBufferProtection", {clear = true})
+  
+  -- Prevent insertion mode and any text modification
+  vim.api.nvim_create_autocmd({"InsertEnter", "TextChanged", "TextChangedI", "TextChangedP"}, {
+    group = augroup,
+    buffer = M.buffer_id,
+    callback = function()
+      -- Silently force back to normal mode if in insert mode
+      if vim.api.nvim_get_mode().mode:match("[iR]") then
+        vim.cmd("stopinsert")
+      end
+      return true -- prevent the event
+    end
+  })
+  
+  -- Override common editing commands
+  local opts = {noremap = true, silent = true, buffer = M.buffer_id}
+  local protected_keys = {"i", "I", "a", "A", "o", "O", "c", "C", "s", "S", "x", "X", "d", "D", "p", "P"}
+  
+  for _, key in ipairs(protected_keys) do
+    vim.keymap.set("n", key, function()
+      -- Silently ignore editing attempts
+    end, opts)
+  end
+  
+  -- Protect against paste operations
+  vim.keymap.set({"n", "v"}, "<C-v>", function()
+    -- Silently ignore paste attempts
+  end, opts)
+end
+
 function M.create_window(config)
   config = config or {}
   
@@ -32,13 +67,15 @@ function M.create_window(config)
   
   -- Create buffer
   M.buffer_id = vim.api.nvim_create_buf(false, true)
-  -- Set buffer options
+  -- Set buffer options to make it non-editable
   vim.api.nvim_buf_set_option(M.buffer_id, "filetype", "luxterm_main")
   vim.api.nvim_buf_set_option(M.buffer_id, "bufhidden", "wipe")
   vim.api.nvim_buf_set_option(M.buffer_id, "swapfile", false)
   vim.api.nvim_buf_set_option(M.buffer_id, "buftype", "nofile")
-  -- Only set modifiable to false, don't set readonly (causes conflicts)
   vim.api.nvim_buf_set_option(M.buffer_id, "modifiable", false)
+  
+  -- Additional protection: prevent any modification attempts
+  M.setup_buffer_protection()
   
   -- Calculate window size
   local width = math.floor(vim.o.columns * 0.4)
@@ -123,6 +160,7 @@ function M.render()
   -- Temporarily enable modifiable to update content
   vim.api.nvim_buf_set_option(M.buffer_id, "modifiable", true)
   vim.api.nvim_buf_set_lines(M.buffer_id, 0, -1, false, lines)
+  -- Ensure buffer is locked again after content update
   vim.api.nvim_buf_set_option(M.buffer_id, "modifiable", false)
   
   -- Apply highlights
