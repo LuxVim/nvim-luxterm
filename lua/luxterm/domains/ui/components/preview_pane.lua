@@ -29,6 +29,7 @@ function M.setup(opts)
   M._setup_event_listeners()
 end
 
+
 function M._setup_event_listeners()
   event_bus.subscribe(event_types.SESSION_CONTENT_CHANGED, function(payload)
     if payload.session_id and M.current_session and M.current_session.id == payload.session_id then

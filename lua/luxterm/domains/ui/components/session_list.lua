@@ -31,18 +31,55 @@ function M.setup(opts)
 end
 
 function M._setup_highlight_groups()
-  -- Orange highlight for selected session borders with background for better visibility
-  vim.api.nvim_set_hl(0, "LuxtermSessionSelected", { 
-    fg = "#FFA500", 
-    bg = "#2D1B0E",
+  -- Get the normal background color from the current theme
+  local normal_hl = vim.api.nvim_get_hl(0, { name = "Normal" })
+  local normal_bg = normal_hl.bg and string.format("#%06x", normal_hl.bg) or "NONE"
+  
+  -- Match luxdash highlighting scheme
+  -- Session icons (orange like recent file icons)
+  vim.api.nvim_set_hl(0, "LuxtermSessionIcon", { 
+    fg = "#ff7801"  -- Orange like LuxDashRecentIcon
+  })
+  
+  -- Session names (light gray like file names)
+  vim.api.nvim_set_hl(0, "LuxtermSessionName", { 
+    fg = "#d4d4d4"  -- Light gray like LuxDashRecentFile
+  })
+  
+  -- Session numeric keys (magenta/pink bold like recent file keys)
+  vim.api.nvim_set_hl(0, "LuxtermSessionKey", { 
+    fg = "#db2dee",  -- Magenta/pink like LuxDashRecentKey
     bold = true 
   })
-  -- Grey highlight for non-selected session borders
+  
+  -- Menu-style icons (teal/cyan for action items)
+  vim.api.nvim_set_hl(0, "LuxtermMenuIcon", { 
+    fg = "#4ec9b0"  -- Teal/cyan like LuxDashMenuIcon
+  })
+  
+  -- Menu-style text (light gray for action labels)
+  vim.api.nvim_set_hl(0, "LuxtermMenuText", { 
+    fg = "#d4d4d4"  -- Light gray like LuxDashMenuText
+  })
+  
+  -- Menu-style keys (yellow bold for action keymaps)
+  vim.api.nvim_set_hl(0, "LuxtermMenuKey", { 
+    fg = "#dcdcaa",  -- Yellow like LuxDashMenuKey
+    bold = true
+  })
+  
+  -- Border highlights for selected/non-selected sessions
+  vim.api.nvim_set_hl(0, "LuxtermSessionSelected", { 
+    fg = "#FFA500", 
+    bg = normal_bg,
+    bold = true 
+  })
   vim.api.nvim_set_hl(0, "LuxtermSessionNormal", { 
     fg = "#6B6B6B",
     bg = "NONE"
   })
 end
+
 
 function M._apply_highlights(highlights)
   if not M.buffer_id or not vim.api.nvim_buf_is_valid(M.buffer_id) then
@@ -185,7 +222,7 @@ function M._generate_content_with_highlights()
   end
   
   if M.render_config.show_shortcuts then
-    M._add_shortcuts_content(lines)
+    M._add_shortcuts_content_with_highlights(lines, highlights)
   end
   
   return {
@@ -222,36 +259,13 @@ end
 
 function M._add_session_list_content_with_highlights(lines, highlights)
   for i, session in ipairs(M.sessions_data) do
-    local formatted_content = M._format_session_line(session, i)
-    local is_selected = i == M.selected_session_index
-    local highlight_group = is_selected and "LuxtermSessionSelected" or "LuxtermSessionNormal"
+    local formatted_content = M._format_session_line_with_highlights(session, i, lines, highlights)
     
     if type(formatted_content) == "table" then
-      -- Multi-line bordered display
-      for _, line in ipairs(formatted_content) do
-        local line_num = #lines
-        table.insert(lines, line)
-        -- Highlight the entire border line
-        table.insert(highlights, {
-          line = line_num,
-          col_start = 0,
-          col_end = -1,
-          hl_group = highlight_group
-        })
-      end
+      -- Multi-line bordered display - lines and highlights already added by _format_session_line_with_highlights
       table.insert(lines, "") -- Add spacing between sessions
     else
-      -- Single line fallback
-      local line_num = #lines
-      table.insert(lines, formatted_content)
-      if is_selected then
-        table.insert(highlights, {
-          line = line_num,
-          col_start = 0,
-          col_end = 2, -- Just highlight the selection marker
-          hl_group = highlight_group
-        })
-      end
+      -- Single line fallback - handled by _format_session_line_with_highlights
     end
   end
   
@@ -295,10 +309,10 @@ function M._format_session_line(session, index)
     local border_chars = M._get_border_chars(is_selected)
     
     -- Build lines with consistent inner padding and contextual borders
-    local top_border = border_chars.top_left .. " " .. name .. " " .. string.rep(border_chars.horizontal, inner_width - name_width -1) .. border_chars.horizontal .. border_chars.top_right
-    local status_line = border_chars.vertical .. " " .. status_display .. string.rep(" ", inner_width - status_width) .. " " .. border_chars.vertical
-    local hotkey_line = border_chars.vertical .. " " .. hotkey_display .. string.rep(" ", inner_width - hotkey_width) .. " " .. border_chars.vertical
-    local bottom_border = border_chars.bottom_left .. string.rep(border_chars.horizontal, inner_width + 2) .. border_chars.bottom_right
+    local top_border = "  " .. border_chars.top_left .. " " .. name .. " " .. string.rep(border_chars.horizontal, inner_width - name_width -1) .. border_chars.horizontal .. border_chars.top_right
+    local status_line = "  " .. border_chars.vertical .. " " .. status_display .. string.rep(" ", inner_width - status_width) .. " " .. border_chars.vertical
+    local hotkey_line = "  " .. border_chars.vertical .. " " .. hotkey_display .. string.rep(" ", inner_width - hotkey_width) .. " " .. border_chars.vertical
+    local bottom_border = "  " .. border_chars.bottom_left .. string.rep(border_chars.horizontal, inner_width + 2) .. border_chars.bottom_right
     
     return {
       top_border,
@@ -308,7 +322,142 @@ function M._format_session_line(session, index)
     }
   else
     local selection_marker = is_selected and "► " or "  "
-    return selection_marker .. name .. " " .. shortcut
+    return "  " .. selection_marker .. name .. " " .. shortcut
+  end
+end
+
+function M._format_session_line_with_highlights(session, index, lines, highlights)
+  local status_icon = M._get_status_icon(session)
+  local name = M._truncate_name(session.name, M.render_config.max_name_length)
+  local shortcut = string.format("[%d]", index)
+  
+  -- Determine if this session is selected (for highlighting)
+  local is_selected = index == M.selected_session_index
+  local is_active = session.id == M.active_session_id
+  local highlight_group = is_selected and "LuxtermSessionSelected" or "LuxtermSessionNormal"
+  
+  if M.render_config.show_status then
+    -- Get actual status text
+    local status_text = "unknown"
+    if session.get_status then
+      status_text = session:get_status()
+    end
+    
+    -- Create bordered display with consistent width
+    local status_display = status_icon .. " " .. status_text
+    local hotkey_display = "Press " .. shortcut .. " to open"
+    
+    -- Add active indicator in status if active
+    if is_active then
+      status_display = status_display .. " (active)"
+    end
+    
+    -- Use vim.fn.strdisplaywidth for proper terminal display width (handles emoji correctly)
+    local name_width = vim.fn.strdisplaywidth(name)
+    local status_width = vim.fn.strdisplaywidth(status_display)
+    local hotkey_width = vim.fn.strdisplaywidth(hotkey_display)
+    
+    -- Calculate consistent inner content width (the space inside borders)
+    local inner_width = math.max(name_width, status_width, hotkey_width)
+    
+    -- Choose border characters based on selection state
+    local border_chars = M._get_border_chars(is_selected)
+    
+    -- Build lines with consistent inner padding and contextual borders
+    local top_border = "  " .. border_chars.top_left .. " " .. name .. " " .. string.rep(border_chars.horizontal, inner_width - name_width -1) .. border_chars.horizontal .. border_chars.top_right
+    local status_line = "  " .. border_chars.vertical .. " " .. status_display .. string.rep(" ", inner_width - status_width) .. " " .. border_chars.vertical
+    local hotkey_line = "  " .. border_chars.vertical .. " " .. hotkey_display .. string.rep(" ", inner_width - hotkey_width) .. " " .. border_chars.vertical
+    local bottom_border = "  " .. border_chars.bottom_left .. string.rep(border_chars.horizontal, inner_width + 2) .. border_chars.bottom_right
+    
+    -- Add lines and their highlights
+    local session_lines = {top_border, status_line, hotkey_line, bottom_border}
+    
+    for _, line in ipairs(session_lines) do
+      local line_num = #lines
+      table.insert(lines, line)
+      
+      -- Highlight entire border line for selection
+      table.insert(highlights, {
+        line = line_num,
+        col_start = 0,
+        col_end = -1,
+        hl_group = highlight_group
+      })
+      
+      -- Add luxdash-style highlights for icons and keys within bordered content
+      if line == top_border then
+        -- Highlight session name (luxdash style)
+        local name_start = vim.fn.strdisplaywidth("  " .. border_chars.top_left .. " ")
+        local name_end = name_start + name_width
+        table.insert(highlights, {
+          line = line_num,
+          col_start = name_start,
+          col_end = name_end,
+          hl_group = "LuxtermSessionName"
+        })
+      elseif line == status_line then
+        -- Highlight status icon (luxdash style - orange like recent file icons)
+        local icon_start = vim.fn.strdisplaywidth("  " .. border_chars.vertical .. " ")
+        local icon_end = icon_start + vim.fn.strdisplaywidth(status_icon)
+        table.insert(highlights, {
+          line = line_num,
+          col_start = icon_start,
+          col_end = icon_end,
+          hl_group = "LuxtermSessionIcon"
+        })
+      elseif line == hotkey_line then
+        -- Highlight numeric key (luxdash style - magenta/pink bold like recent file keys)
+        local key_pattern = "%[%d+%]"
+        local key_start, key_end = string.find(line, key_pattern)
+        if key_start then
+          table.insert(highlights, {
+            line = line_num,
+            col_start = key_start - 1, -- Convert to 0-based indexing
+            col_end = key_end,
+            hl_group = "LuxtermSessionKey"
+          })
+        end
+      end
+    end
+    
+    return session_lines
+  else
+    local selection_marker = is_selected and "► " or "  "
+    local line_content = "  " .. selection_marker .. name .. " " .. shortcut
+    local line_num = #lines
+    table.insert(lines, line_content)
+    
+    if is_selected then
+      -- Highlight selection marker
+      table.insert(highlights, {
+        line = line_num,
+        col_start = 0,
+        col_end = 4, -- Highlight "  ► "
+        hl_group = highlight_group
+      })
+    end
+    
+    -- Highlight session name (luxdash style)
+    local name_start = vim.fn.strdisplaywidth("  " .. selection_marker)
+    local name_end = name_start + vim.fn.strdisplaywidth(name)
+    table.insert(highlights, {
+      line = line_num,
+      col_start = name_start,
+      col_end = name_end,
+      hl_group = "LuxtermSessionName"
+    })
+    
+    -- Highlight numeric key (luxdash style)
+    local key_start = name_end + 1
+    local key_end = key_start + vim.fn.strdisplaywidth(shortcut)
+    table.insert(highlights, {
+      line = line_num,
+      col_start = key_start,
+      col_end = key_end,
+      hl_group = "LuxtermSessionKey"
+    })
+    
+    return line_content
   end
 end
 
@@ -360,16 +509,116 @@ end
 
 function M._add_shortcuts_content(lines)
   if #M.sessions_data > 0 then
-    table.insert(lines, "󰷈 New session              [n]")
-    table.insert(lines, "󰆴 Delete session           [d]")
-    table.insert(lines, "󰑕 Rename session           [r]")
+    table.insert(lines, "  󰷈  New session              [n]")
+    table.insert(lines, "  󰆴  Delete session           [d]")
+    table.insert(lines, "  󰑕  Rename session           [r]")
     table.insert(lines, "")
   else
-    table.insert(lines, "󰷈 New session              [n]")
+    table.insert(lines, "  󰷈  New session              [n]")
     table.insert(lines, "")
   end
   
-  table.insert(lines, "󰅖 Close                    [Esc]")
+  table.insert(lines, "  󰅖  Close                    [Esc]")
+end
+
+function M._add_shortcuts_content_with_highlights(lines, highlights)
+  local shortcuts_data = {}
+  
+  if #M.sessions_data > 0 then
+    shortcuts_data = {
+      { icon = "󰷈", label = "New session", key = "[n]" },
+      { icon = "󰆴", label = "Delete session", key = "[d]" },
+      { icon = "󰑕", label = "Rename session", key = "[r]" }
+    }
+  else
+    shortcuts_data = {
+      { icon = "󰷈", label = "New session", key = "[n]" }
+    }
+  end
+  
+  -- Add menu items with luxdash-style highlighting
+  for _, item in ipairs(shortcuts_data) do
+    local line_num = #lines
+    local line_content = "  " .. item.icon .. "  " .. item.label
+    
+    -- Calculate padding to align keys to the right
+    local target_width = 40 -- Consistent with luxdash layout
+    local content_width = vim.fn.strdisplaywidth(line_content)
+    local key_width = vim.fn.strdisplaywidth(item.key)
+    local padding_needed = target_width - content_width - key_width
+    local padding = string.rep(" ", math.max(1, padding_needed))
+    
+    local full_line = line_content .. padding .. item.key
+    table.insert(lines, full_line)
+    
+    -- Add highlights for icon, text, and key separately (luxdash style)
+    local icon_end = 2 + vim.fn.strdisplaywidth(item.icon)
+    local text_start = icon_end + 2
+    local text_end = text_start + vim.fn.strdisplaywidth(item.label)
+    local key_start = text_end + padding_needed
+    local key_end = key_start + key_width
+    
+    -- Icon highlight (teal/cyan like luxdash menu icons)
+    table.insert(highlights, {
+      line = line_num,
+      col_start = 2,
+      col_end = icon_end,
+      hl_group = "LuxtermMenuIcon"
+    })
+    
+    -- Text highlight (light gray like luxdash menu text)
+    table.insert(highlights, {
+      line = line_num,
+      col_start = text_start,
+      col_end = text_end,
+      hl_group = "LuxtermMenuText"
+    })
+    
+    -- Key highlight (yellow bold like luxdash menu keys)
+    table.insert(highlights, {
+      line = line_num,
+      col_start = key_start,
+      col_end = key_end,
+      hl_group = "LuxtermMenuKey"
+    })
+  end
+  
+  if #shortcuts_data > 0 then
+    table.insert(lines, "")
+  end
+  
+  -- Add close option
+  local line_num = #lines
+  local close_line = "  󰅖  Close                    [Esc]"
+  table.insert(lines, close_line)
+  
+  -- Highlight close option parts
+  local close_icon_end = 2 + vim.fn.strdisplaywidth("󰅖")
+  local close_text_start = close_icon_end + 2
+  local close_text_end = close_text_start + vim.fn.strdisplaywidth("Close")
+  local close_key_start = vim.fn.strdisplaywidth("  󰅖  Close                    ")
+  local close_key_end = vim.fn.strdisplaywidth(close_line)
+  
+  table.insert(highlights, {
+    line = line_num,
+    col_start = 2,
+    col_end = close_icon_end,
+    hl_group = "LuxtermMenuIcon"
+  })
+  
+  table.insert(highlights, {
+    line = line_num,
+    col_start = close_text_start,
+    col_end = close_text_end,
+    hl_group = "LuxtermMenuText"
+  })
+  
+  table.insert(highlights, {
+    line = line_num,
+    col_start = close_key_start,
+    col_end = close_key_end,
+    hl_group = "LuxtermMenuKey"
+  })
 end
 
 function M._setup_keymaps()

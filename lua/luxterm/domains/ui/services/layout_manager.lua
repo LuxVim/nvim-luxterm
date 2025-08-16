@@ -105,6 +105,15 @@ function M._setup_layout_components(layout)
   
   preview_pane.window_id = layout.windows.right.winid
   preview_pane.buffer_id = layout.windows.right.bufnr
+  
+  -- Hide cursor in manager windows
+  vim.api.nvim_win_call(layout.windows.left.winid, function()
+    vim.opt_local.guicursor = "a:block-NONE"
+  end)
+  
+  vim.api.nvim_win_call(layout.windows.right.winid, function()
+    vim.opt_local.guicursor = "a:block-NONE"
+  end)
 end
 
 function M._setup_layout_focus_management(layout)
