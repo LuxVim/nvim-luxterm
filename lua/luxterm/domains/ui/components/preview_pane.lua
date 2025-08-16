@@ -11,6 +11,7 @@ local M = {
   current_session = nil,
   refresh_timer_id = nil,
   content_watcher_id = nil,
+  loading_refresh_scheduled = false,
   config = {
     max_lines = 50,
     refresh_enabled = true
@@ -79,6 +80,7 @@ end
 
 function M.set_session(session)
   M.current_session = session
+  M.loading_refresh_scheduled = false  -- Reset loading state for new session
   M._setup_content_watching()
   M.render()
 end
@@ -141,31 +143,75 @@ end
 
 
 function M._add_terminal_content(lines)
-  local terminal_lines = {}
+  if not M.current_session or not M.current_session.bufnr or not vim.api.nvim_buf_is_valid(M.current_session.bufnr) then
+    table.insert(lines, "[No session]")
+    return
+  end
   
-  -- Check if current session exists and is valid before accessing its bufnr
-  if M.current_session and M.current_session.bufnr and vim.api.nvim_buf_is_valid(M.current_session.bufnr) then
-    -- Additional check to ensure it's actually a terminal buffer
-    if vim.bo[M.current_session.bufnr].buftype == 'terminal' then
-      terminal_lines = content_extractor.extract_terminal_content(M.current_session.bufnr, {
-        max_lines = M.config.max_lines,
-        clean_ansi = true
-      })
+  if vim.bo[M.current_session.bufnr].buftype ~= 'terminal' then
+    table.insert(lines, "[Not a terminal buffer]")
+    return
+  end
+  
+  -- Get raw terminal content first
+  local raw_lines = vim.api.nvim_buf_get_lines(M.current_session.bufnr, 0, -1, false)
+  
+  -- Remove empty lines from the end
+  while #raw_lines > 0 and raw_lines[#raw_lines] == "" do
+    table.remove(raw_lines)
+  end
+  
+  -- Limit to max lines (take the last N lines)
+  if #raw_lines > M.config.max_lines then
+    raw_lines = vim.list_slice(raw_lines, #raw_lines - M.config.max_lines + 1, #raw_lines)
+  end
+  
+  -- Simple content check: do we have any lines with content?
+  local has_meaningful_content = false
+  for _, line in ipairs(raw_lines) do
+    if line and line:match("%S") then -- Contains non-whitespace characters
+      has_meaningful_content = true
+      break
     end
   end
   
-  if #terminal_lines == 0 or (#terminal_lines == 1 and terminal_lines[1] == "") then
+  -- For newly created terminals without content yet
+  if not has_meaningful_content then
+    if M.current_session.created_at then
+      local time_since_creation = vim.loop.now() - M.current_session.created_at
+      if time_since_creation < 2000 then -- Less than 2 seconds old
+        table.insert(lines, "  Loading terminal...")
+        table.insert(lines, "")
+        table.insert(lines, "  Waiting for shell prompt...")
+        
+        -- Schedule a single refresh
+        if not M.loading_refresh_scheduled then
+          M.loading_refresh_scheduled = true
+          vim.defer_fn(function()
+            M.loading_refresh_scheduled = false
+            M.render()
+          end, 1000)
+        end
+        return
+      end
+    end
     table.insert(lines, "[Empty terminal]")
-  else
-    local window_width = 80
-    if M.window_id and vim.api.nvim_win_is_valid(M.window_id) then
-      window_width = vim.api.nvim_win_get_width(M.window_id) - 2
-    end
+    return
+  end
+  
+  -- We have content, so display it (with minimal ANSI cleaning)
+  local window_width = 80
+  if M.window_id and vim.api.nvim_win_is_valid(M.window_id) then
+    window_width = vim.api.nvim_win_get_width(M.window_id) - 2
+  end
+  
+  for _, line in ipairs(raw_lines) do
+    -- Basic ANSI cleaning but preserve structure
+    local cleaned_line = line:gsub("\27%[[%d;]*[mK]", "")
+    cleaned_line = cleaned_line:gsub("[\1-\8\11\12\14-\31\127]", "")
     
-    for _, line in ipairs(terminal_lines) do
-      local formatted_line = M._format_terminal_line(line, window_width)
-      table.insert(lines, formatted_line)
-    end
+    local formatted_line = M._format_terminal_line(cleaned_line, window_width)
+    table.insert(lines, formatted_line)
   end
 end
 

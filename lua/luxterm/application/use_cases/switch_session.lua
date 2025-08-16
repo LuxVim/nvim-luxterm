@@ -55,11 +55,10 @@ function M.execute_and_open_floating(session_id, params)
   
   local session = session_or_error
   
-  if layout_manager.is_manager_open() then
-    local active_layout = layout_manager.get_active_layout()
-    if active_layout then
-      layout_manager.close_layout(active_layout.id)
-    end
+  -- Close any active layout (manager or session)
+  local active_layout = layout_manager.get_active_layout()
+  if active_layout then
+    layout_manager.close_layout(active_layout.id)
   end
   
   local layout_id = layout_manager.create_session_window_layout(session, params.layout_config)

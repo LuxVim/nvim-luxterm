@@ -264,8 +264,21 @@ function M._close_manager_layout(layout)
     pcall(vim.api.nvim_del_autocmd, layout.focus_autocmd)
   end
   
+  -- Clean up event handlers stored in the layout
+  if layout.cleanup_handlers then
+    for _, cleanup in ipairs(layout.cleanup_handlers) do
+      cleanup()
+    end
+    layout.cleanup_handlers = nil
+  end
+  
   event_bus.emit(event_types.MANAGER_CLOSED, {
     layout_id = layout.id
+  })
+  
+  -- Trigger User autocmd for legacy cleanup mechanisms
+  vim.api.nvim_exec_autocmds("User", {
+    pattern = "LuxtermManagerClosed"
   })
 end
 

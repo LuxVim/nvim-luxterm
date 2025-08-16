@@ -20,15 +20,16 @@ function M.execute(params)
     return M._close_manager(params)
   end
   
-  -- Get the current active layout to check if it's a session
+  -- Check for active session layout right before we need it
   local active_layout = layout_manager.get_active_layout()
   
-  -- If we have an active session layout, close it before opening manager
+  -- If we have an active session layout, close it and return (true toggle behavior)
   if active_layout and active_layout.type == "session" then
-    layout_manager.close_layout(active_layout.id)
+    local success = layout_manager.close_layout(active_layout.id)
+    return success, "session_closed"
   end
   
-  -- Always open the manager
+  -- Only open the manager if nothing else is open
   return M._open_manager(params)
 end
 
@@ -102,10 +103,11 @@ function M._setup_manager_components(layout, sessions, active_session)
   session_list.update_sessions(sessions, active_session and active_session.id or nil)
   session_list.render()
   
-  -- Only set up preview pane if we have a valid active session
-  if active_session and active_session:is_valid() then
-    preview_pane.set_session(active_session)
-    preview_pane.preload_content(active_session)
+  -- Set up preview pane for the currently selected session
+  local selected_session = session_list.get_selected_session()
+  if selected_session and selected_session:is_valid() then
+    preview_pane.set_session(selected_session)
+    preview_pane.preload_content(selected_session)
   else
     -- Explicitly clear the preview pane when no valid session exists
     preview_pane.set_session(nil)
@@ -184,9 +186,9 @@ function M._handle_ui_action(event_type, payload, layout_id)
     end
     
   elseif event_type == event_types.UI_ACTION_OPEN_SESSION then
-    local active_session = session_manager.get_active_session()
-    if active_session then
-      switch_session_use_case.execute_and_open_floating(active_session.id)
+    local selected_session = session_list.get_selected_session()
+    if selected_session then
+      switch_session_use_case.execute_and_open_floating(selected_session.id)
     end
     
   elseif event_type == event_types.UI_ACTION_CLOSE_MANAGER then
@@ -194,9 +196,11 @@ function M._handle_ui_action(event_type, payload, layout_id)
     
   elseif event_type == event_types.UI_ACTION_NAVIGATE_UP then
     session_list.navigate_to_session("up")
+    M._update_preview_for_selected_session()
     
   elseif event_type == event_types.UI_ACTION_NAVIGATE_DOWN then
     session_list.navigate_to_session("down")
+    M._update_preview_for_selected_session()
   end
 end
 
@@ -236,6 +240,23 @@ function M._refresh_manager_content()
     
     if active_session then
       preview_pane.set_session(active_session)
+    end
+    preview_pane.render()
+  end)
+end
+
+function M._update_preview_for_selected_session()
+  if not layout_manager.is_manager_open() then
+    return
+  end
+  
+  vim.schedule(function()
+    local selected_session = session_list.get_selected_session()
+    if selected_session and selected_session:is_valid() then
+      preview_pane.set_session(selected_session)
+      preview_pane.preload_content(selected_session)
+    else
+      preview_pane.set_session(nil)
     end
     preview_pane.render()
   end)

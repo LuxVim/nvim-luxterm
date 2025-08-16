@@ -172,6 +172,12 @@ function M.get_session_name(config, session_id)
   return string.format(config.session_name_template, session_id)
 end
 
+function M.get_default_session_name(config)
+  local session_manager = require("luxterm.domains.terminal.services.session_manager")
+  local lowest_number = session_manager.get_lowest_available_session_number()
+  return string.format(config.session_name_template, lowest_number)
+end
+
 function M.merge_layout_config(config, user_layout_config)
   local layout_config = {
     manager_width = config.manager_width,

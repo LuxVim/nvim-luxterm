@@ -31,10 +31,17 @@ function M.create_session(opts)
     return nil, "Failed to create buffer"
   end
   
+  -- Generate default name if none provided
+  local session_name = opts.name
+  if not session_name then
+    local lowest_number = M.get_lowest_available_session_number()
+    session_name = "Terminal " .. lowest_number
+  end
+  
   local session = Session.new({
     id = session_id,
     bufnr = bufnr,
-    name = opts.name,
+    name = session_name,
     working_directory = opts.working_directory or vim.fn.getcwd(),
     shell_command = opts.shell_command,
     metadata = opts.metadata or {}
@@ -235,6 +242,31 @@ end
 
 function M.get_session_count()
   return vim.tbl_count(M.sessions)
+end
+
+function M.get_lowest_available_session_number()
+  if vim.tbl_count(M.sessions) == 0 then
+    return 1
+  end
+  
+  local session_numbers = {}
+  for _, session in pairs(M.sessions) do
+    if session:is_valid() then
+      local session_name = session.name or ""
+      local number = session_name:match("Terminal (%d+)$")
+      if number then
+        session_numbers[tonumber(number)] = true
+      end
+    end
+  end
+  
+  for i = 1, math.huge do
+    if not session_numbers[i] then
+      return i
+    end
+  end
+  
+  return 1
 end
 
 function M.clear_all_sessions()

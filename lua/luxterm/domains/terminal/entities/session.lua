@@ -11,8 +11,8 @@ function Session.new(opts)
     id = opts.id,
     bufnr = opts.bufnr,
     name = opts.name or "Terminal " .. (opts.id or 1),
-    created_at = opts.created_at or os.time(),
-    last_accessed = opts.last_accessed or os.time(),
+    created_at = opts.created_at or vim.loop.now(),
+    last_accessed = opts.last_accessed or vim.loop.now(),
     status = opts.status or "inactive",
     working_directory = opts.working_directory,
     shell_command = opts.shell_command,
@@ -61,7 +61,7 @@ end
 
 function Session:activate()
   if self:is_valid() then
-    self.last_accessed = os.time()
+    self.last_accessed = vim.loop.now()
     self.status = "active"
     event_bus.emit(event_types.SESSION_SWITCHED, { 
       session_id = self.id,

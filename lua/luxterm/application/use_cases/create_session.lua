@@ -46,16 +46,10 @@ function M.execute_and_open_floating(params)
     return nil, error_msg
   end
   
-  if layout_manager.is_manager_open() then
-    local active_layout = layout_manager.get_active_layout()
-    if active_layout then
-      layout_manager.close_layout(active_layout.id)
-    end
-  end
+  -- The floating window is already created in M.execute() via _open_session_in_floating_window
+  -- No need to create it again here
   
-  local layout_id = layout_manager.create_session_window_layout(session, params.layout_config)
-  
-  return session, nil, layout_id
+  return session, nil
 end
 
 function M._open_session_in_floating_window(session, params)
@@ -74,7 +68,7 @@ end
 function M.execute_with_prompt(params)
   params = params or {}
   
-  local default_name = string.format("Terminal %d", session_manager.get_session_count() + 1)
+  local default_name = string.format("Terminal %d", session_manager.get_lowest_available_session_number())
   
   vim.ui.input({
     prompt = "Session name: ",
@@ -94,8 +88,8 @@ function M.execute_with_prompt(params)
 end
 
 function M.execute_quick(name_suffix)
-  local session_count = session_manager.get_session_count()
-  local name = "Terminal " .. (session_count + 1)
+  local lowest_number = session_manager.get_lowest_available_session_number()
+  local name = "Terminal " .. lowest_number
   if name_suffix then
     name = name .. " " .. name_suffix
   end
