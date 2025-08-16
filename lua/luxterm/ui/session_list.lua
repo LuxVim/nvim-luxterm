@@ -134,7 +134,10 @@ function M.add_session_content(lines, highlights, session, index)
   local status_icon = M.get_status_icon(session)
   local name = M.truncate_name(session.name, 18)
   local status_text = session:get_status()
-  local hotkey = string.format("[%d]", index)
+  
+  -- Extract session number from name if it's a default session, otherwise use list index
+  local session_num = string.match(session.name, "^Session (%d+)$")
+  local hotkey = session_num and string.format("[%s]", session_num) or string.format("[%d]", index)
   
   -- Add active indicator
   if is_active then
@@ -294,10 +297,13 @@ function M.setup_keymaps()
   vim.keymap.set("n", "<Down>", function() M.navigate("down") end, opts)
   vim.keymap.set("n", "<Up>", function() M.navigate("up") end, opts)
   
-  -- Number keys for direct selection
+  -- Number keys for direct selection by session number
   for i = 1, 9 do
     vim.keymap.set("n", tostring(i), function() 
-      M.emit_action("select_session", {index = i}) 
+      local session, index = M.get_session_by_number(i)
+      if session then
+        M.emit_action("select_session", {index = index}) 
+      end
     end, opts)
   end
 end
@@ -324,6 +330,12 @@ function M.navigate(direction)
   end
   
   M.render()
+  
+  -- Emit selection change event to update preview
+  M.emit_action("selection_changed", {
+    session = M.get_selected_session(),
+    index = M.selected_session_index
+  })
 end
 
 function M.get_selected_session()
@@ -338,6 +350,16 @@ function M.get_session_at_index(index)
     return M.sessions_data[index]
   end
   return nil
+end
+
+function M.get_session_by_number(session_num)
+  for i, session in ipairs(M.sessions_data) do
+    local num = string.match(session.name, "^Session (%d+)$")
+    if num and tonumber(num) == session_num then
+      return session, i
+    end
+  end
+  return nil, nil
 end
 
 function M.is_visible()

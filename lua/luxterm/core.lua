@@ -63,7 +63,7 @@ function M.setup_event_handlers()
   end)
   
   session_list.on_action("delete_session", function()
-    M.delete_active_session()
+    M.delete_selected_session()
   end)
   
   session_list.on_action("rename_session", function()
@@ -80,6 +80,10 @@ function M.setup_event_handlers()
   
   session_list.on_action("select_session", function(payload)
     M.select_session_by_index(payload.index)
+  end)
+  
+  session_list.on_action("selection_changed", function(payload)
+    M.update_preview_for_selection(payload.session)
   end)
   
   -- Event tracking
@@ -104,6 +108,28 @@ function M.setup_autocmds()
     group = vim.api.nvim_create_augroup("LuxtermVimLeavePre", {clear = true}),
     callback = function()
       M.cleanup()
+    end
+  })
+  
+  -- Auto-refresh preview when terminal content changes
+  vim.api.nvim_create_autocmd({"TextChanged", "TextChangedI", "TextChangedP"}, {
+    group = vim.api.nvim_create_augroup("LuxtermContentUpdate", {clear = true}),
+    callback = function(args)
+      -- Only refresh if this is a terminal buffer managed by luxterm
+      if vim.bo[args.buf].buftype == "terminal" then
+        local sessions = session_manager.get_all_sessions()
+        for _, session in ipairs(sessions) do
+          if session.bufnr == args.buf then
+            -- Debounce the refresh to avoid excessive updates
+            vim.defer_fn(function()
+              if M.is_manager_open() and M.config.preview_enabled then
+                M.refresh_manager()
+              end
+            end, 100)
+            break
+          end
+        end
+      end
     end
   })
 end
@@ -334,6 +360,12 @@ function M.refresh_manager()
   end
 end
 
+function M.update_preview_for_selection(session)
+  if M.config.preview_enabled and preview_pane.is_visible() then
+    preview_pane.update_preview(session)
+  end
+end
+
 -- Session management operations
 function M.create_session(opts)
   opts = opts or {}
@@ -388,6 +420,14 @@ function M.delete_active_session()
   local active = session_manager.get_active_session()
   if active then
     return M.delete_session(active.id, {confirm = true})
+  end
+  return false
+end
+
+function M.delete_selected_session()
+  local session = session_list.get_selected_session()
+  if session then
+    return M.delete_session(session.id, {confirm = true})
   end
   return false
 end
@@ -492,17 +532,18 @@ end
 function M.list_sessions()
   local sessions = session_manager.get_all_sessions()
   if #sessions == 0 then
-    print("No active sessions")
+    vim.notify("No active sessions", vim.log.levels.INFO)
     return
   end
   
-  print("Active sessions:")
+  local session_lines = {"Active sessions:"}
   for i, session in ipairs(sessions) do
     local status = session:get_status()
     local active = session_manager.get_active_session()
     local active_marker = active and session.id == active.id and " (active)" or ""
-    print(string.format("  %d. %s [%s]%s", i, session.name, status, active_marker))
+    table.insert(session_lines, string.format("  %d. %s [%s]%s", i, session.name, status, active_marker))
   end
+  vim.notify(table.concat(session_lines, "\n"), vim.log.levels.INFO)
 end
 
 function M.show_stats()
@@ -519,9 +560,7 @@ function M.show_stats()
     string.format("Active sessions: %d", session_count)
   }
   
-  for _, line in ipairs(stats_lines) do
-    print(line)
-  end
+  vim.notify(table.concat(stats_lines, "\n"), vim.log.levels.INFO)
 end
 
 function M.cleanup()
