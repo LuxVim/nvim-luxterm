@@ -135,9 +135,8 @@ function M.add_session_content(lines, highlights, session, index)
   local name = M.truncate_name(session.name, 18)
   local status_text = session:get_status()
   
-  -- Extract session number from name if it's a default session, otherwise use list index
-  local session_num = string.match(session.name, "^Session (%d+)$")
-  local hotkey = session_num and string.format("[%s]", session_num) or string.format("[%d]", index)
+  -- Use list position for hotkey (consistent with keymap behavior)
+  local hotkey = string.format("[%d]", index)
   
   -- Add active indicator
   if is_active then
@@ -353,11 +352,8 @@ function M.get_session_at_index(index)
 end
 
 function M.get_session_by_number(session_num)
-  for i, session in ipairs(M.sessions_data) do
-    local num = string.match(session.name, "^Session (%d+)$")
-    if num and tonumber(num) == session_num then
-      return session, i
-    end
+  if session_num > 0 and session_num <= #M.sessions_data then
+    return M.sessions_data[session_num], session_num
   end
   return nil, nil
 end

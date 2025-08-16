@@ -519,6 +519,10 @@ function M.rename_selected_session()
     if new_name and new_name ~= "" and new_name ~= session.name then
       session.name = new_name
       events.emit(events.SESSION_RENAMED, {session = session})
+      
+      -- Update session window title if it's currently open
+      M.update_session_window_title(session)
+      
       if M.is_manager_open() then
         M.refresh_manager()
       end
@@ -526,6 +530,29 @@ function M.rename_selected_session()
   end)
   
   return true
+end
+
+function M.update_session_window_title(session)
+  if not session or not session:is_valid() then
+    return false
+  end
+  
+  -- Find any floating windows that contain this session's buffer
+  for _, win in ipairs(vim.api.nvim_list_wins()) do
+    if vim.api.nvim_win_is_valid(win) and floating_window.is_floating_window(win) then
+      local buf = vim.api.nvim_win_get_buf(win)
+      if buf == session.bufnr then
+        -- Update the window title
+        vim.api.nvim_win_set_config(win, {
+          title = " " .. session.name .. " ",
+          title_pos = "center"
+        })
+        return true
+      end
+    end
+  end
+  
+  return false
 end
 
 -- Utility functions
