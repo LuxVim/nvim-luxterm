@@ -124,22 +124,5 @@ function M.preload(cache_key, content_generator)
   end
 end
 
-function M.get_stats()
-  local entry_count = 0
-  local total_size = 0
-  
-  for _, entry in pairs(M.rendered_content) do
-    entry_count = entry_count + 1
-    if type(entry.content) == "table" then
-      total_size = total_size + #entry.content
-    end
-  end
-  
-  return {
-    entry_count = entry_count,
-    generation = M.generation_counter,
-    estimated_size = total_size
-  }
-end
 
 return M

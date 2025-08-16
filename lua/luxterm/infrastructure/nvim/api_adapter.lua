@@ -185,12 +185,5 @@ function M.flush_now()
   end
 end
 
-function M.immediate_buf_set_lines(bufnr, start, end_, strict_indexing, replacement)
-  vim.api.nvim_buf_set_lines(bufnr, start, end_, strict_indexing, replacement)
-end
-
-function M.immediate_buf_set_option(bufnr, name, value)
-  vim.api.nvim_buf_set_option(bufnr, name, value)
-end
 
 return M

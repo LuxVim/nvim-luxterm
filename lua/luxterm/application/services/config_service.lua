@@ -215,42 +215,5 @@ function M.should_focus_on_create(config)
   return config.focus_on_create
 end
 
-function M.export_config(config, export_file)
-  export_file = export_file or (vim.fn.stdpath("config") .. "/luxterm_config.lua")
-  
-  local config_content = "return " .. vim.inspect(config)
-  
-  local file = io.open(export_file, "w")
-  if not file then
-    return false, "Failed to open export file"
-  end
-  
-  file:write("-- Luxterm configuration exported on " .. os.date() .. "\n")
-  file:write(config_content)
-  file:close()
-  
-  return true, export_file
-end
-
-function M.load_config_file(config_file)
-  if not config_file or not vim.fn.filereadable(config_file) then
-    return nil, "Config file not found or not readable"
-  end
-  
-  local success, config = pcall(dofile, config_file)
-  if not success then
-    return nil, "Failed to load config file: " .. config
-  end
-  
-  if type(config) ~= "table" then
-    return nil, "Config file must return a table"
-  end
-  
-  return config, nil
-end
-
-function M.reset_to_defaults()
-  return vim.deepcopy(M.defaults)
-end
 
 return M

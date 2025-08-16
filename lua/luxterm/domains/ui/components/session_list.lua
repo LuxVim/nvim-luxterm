@@ -543,9 +543,6 @@ function M._add_shortcuts_content_with_highlights(lines, highlights)
     local full_line = line_content .. padding .. item.key
     table.insert(lines, full_line)
     
-    -- DEBUG: Print line content info
-    print(string.format("Regular '%s': line='%s', content_width=%d, padding_needed=%d", 
-      item.label, full_line, content_width, padding_needed))
     
     -- Add highlights for icon, text, and key separately (luxdash style)
     local icon_end = 2 + vim.fn.strdisplaywidth(item.icon)
@@ -571,9 +568,6 @@ function M._add_shortcuts_content_with_highlights(lines, highlights)
     })
     
     -- Key highlight (yellow bold like luxdash menu keys)
-    -- DEBUG: Print position info
-    print(string.format("Regular item '%s': key_start=%d, key_end=%d, text_end=%d, padding_needed=%d", 
-      item.label, key_start, key_end, text_end, padding_needed))
     table.insert(highlights, {
       line = line_num,
       col_start = key_start,
@@ -602,9 +596,6 @@ function M._add_shortcuts_content_with_highlights(lines, highlights)
   local full_line = line_content .. padding .. close_item.key
   table.insert(lines, full_line)
   
-  -- DEBUG: Print line content info
-  print(string.format("Close: line='%s', content_width=%d, padding_needed=%d", 
-    full_line, content_width, padding_needed))
   
   -- Add highlights for icon, text, and key separately (identical to regular menu items)
   local icon_end = 2 + vim.fn.strdisplaywidth(close_item.icon)
@@ -627,9 +618,6 @@ function M._add_shortcuts_content_with_highlights(lines, highlights)
     hl_group = "LuxtermMenuText"
   })
   
-  -- DEBUG: Print position info for close option
-  print(string.format("Close option: key_start=%d, key_end=%d, text_end=%d, padding_needed=%d", 
-    key_start, key_end, text_end, padding_needed))
   table.insert(highlights, {
     line = line_num,
     col_start = key_start,
@@ -736,11 +724,5 @@ function M.is_visible()
   return M.window_id and vim.api.nvim_win_is_valid(M.window_id)
 end
 
-function M.get_window_info()
-  if M.window_id then
-    return floating_window.get_window_info(M.window_id)
-  end
-  return nil
-end
 
 return M

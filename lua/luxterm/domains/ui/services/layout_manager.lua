@@ -361,23 +361,5 @@ function M.close_all_layouts()
   end
 end
 
-function M.get_layout_stats()
-  local stats = {
-    total_layouts = vim.tbl_count(M.layouts),
-    manager_layouts = 0,
-    session_layouts = 0,
-    active_layout = M.active_layout
-  }
-  
-  for _, layout in pairs(M.layouts) do
-    if layout.type == "manager" then
-      stats.manager_layouts = stats.manager_layouts + 1
-    elseif layout.type == "session" then
-      stats.session_layouts = stats.session_layouts + 1
-    end
-  end
-  
-  return stats
-end
 
 return M

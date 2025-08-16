@@ -305,12 +305,6 @@ function M.is_visible()
   return M.window_id and vim.api.nvim_win_is_valid(M.window_id)
 end
 
-function M.get_window_info()
-  if M.window_id then
-    return floating_window.get_window_info(M.window_id)
-  end
-  return nil
-end
 
 function M.preload_content(session)
   if session and session.bufnr then
