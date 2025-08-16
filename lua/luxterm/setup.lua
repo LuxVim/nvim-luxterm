@@ -1,16 +1,16 @@
-local plugin_orchestrator = require("luxterm.application.services.plugin_orchestrator")
+local core = require("luxterm.core")
 
 local M = {}
 
 function M.setup(user_config)
-  local success, error_msg = pcall(plugin_orchestrator.initialize, user_config)
+  local success, result = pcall(core.setup, user_config)
   
   if not success then
-    vim.notify("Luxterm setup failed: " .. (error_msg or "Unknown error"), vim.log.levels.ERROR)
-    return false
+    vim.notify("Luxterm setup failed: " .. tostring(result), vim.log.levels.ERROR)
+    return {}
   end
   
-  return plugin_orchestrator.get_public_api()
+  return result
 end
 
 return M
