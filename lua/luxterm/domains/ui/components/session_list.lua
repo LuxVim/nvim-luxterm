@@ -31,44 +31,35 @@ function M.setup(opts)
 end
 
 function M._setup_highlight_groups()
-  -- Get the normal background color from the current theme
   local normal_hl = vim.api.nvim_get_hl(0, { name = "Normal" })
   local normal_bg = normal_hl.bg and string.format("#%06x", normal_hl.bg) or "NONE"
   
-  -- Match luxdash highlighting scheme
-  -- Session icons (orange like recent file icons)
   vim.api.nvim_set_hl(0, "LuxtermSessionIcon", { 
-    fg = "#ff7801"  -- Orange like LuxDashRecentIcon
+    fg = "#ff7801"
   })
   
-  -- Session names (light gray like file names)
   vim.api.nvim_set_hl(0, "LuxtermSessionName", { 
-    fg = "#d4d4d4"  -- Light gray like LuxDashRecentFile
+    fg = "#d4d4d4"
   })
   
-  -- Session numeric keys (magenta/pink bold like recent file keys)
   vim.api.nvim_set_hl(0, "LuxtermSessionKey", { 
-    fg = "#db2dee",  -- Magenta/pink like LuxDashRecentKey
+    fg = "#db2dee",
     bold = true 
   })
   
-  -- Menu-style icons (teal/cyan for action items)
   vim.api.nvim_set_hl(0, "LuxtermMenuIcon", { 
-    fg = "#4ec9b0"  -- Teal/cyan like LuxDashMenuIcon
+    fg = "#4ec9b0"
   })
   
-  -- Menu-style text (light gray for action labels)
   vim.api.nvim_set_hl(0, "LuxtermMenuText", { 
-    fg = "#d4d4d4"  -- Light gray like LuxDashMenuText
+    fg = "#d4d4d4"
   })
   
-  -- Menu-style keys (yellow bold for action keymaps)
   vim.api.nvim_set_hl(0, "LuxtermMenuKey", { 
-    fg = "#dcdcaa",  -- Yellow like LuxDashMenuKey
+    fg = "#db2dee",
     bold = true
   })
   
-  -- Border highlights for selected/non-selected sessions
   vim.api.nvim_set_hl(0, "LuxtermSessionSelected", { 
     fg = "#FFA500", 
     bg = normal_bg,
@@ -518,7 +509,7 @@ function M._add_shortcuts_content(lines)
     table.insert(lines, "")
   end
   
-  table.insert(lines, "  󰅖  Close                    [Esc]")
+  table.insert(lines, "  󰅖  Close                      [Esc]")
 end
 
 function M._add_shortcuts_content_with_highlights(lines, highlights)
@@ -542,20 +533,25 @@ function M._add_shortcuts_content_with_highlights(lines, highlights)
     local line_content = "  " .. item.icon .. "  " .. item.label
     
     -- Calculate padding to align keys to the right
-    local target_width = 40 -- Consistent with luxdash layout
+    local target_width = 30 -- Reduced to bring keys closer to text
     local content_width = vim.fn.strdisplaywidth(line_content)
     local key_width = vim.fn.strdisplaywidth(item.key)
     local padding_needed = target_width - content_width - key_width
-    local padding = string.rep(" ", math.max(1, padding_needed))
+    local actual_padding = math.max(1, padding_needed - 4)  -- Reduce actual padding by 4 spaces
+    local padding = string.rep(" ", actual_padding)
     
     local full_line = line_content .. padding .. item.key
     table.insert(lines, full_line)
+    
+    -- DEBUG: Print line content info
+    print(string.format("Regular '%s': line='%s', content_width=%d, padding_needed=%d", 
+      item.label, full_line, content_width, padding_needed))
     
     -- Add highlights for icon, text, and key separately (luxdash style)
     local icon_end = 2 + vim.fn.strdisplaywidth(item.icon)
     local text_start = icon_end + 2
     local text_end = text_start + vim.fn.strdisplaywidth(item.label)
-    local key_start = text_end + padding_needed
+    local key_start = text_end + actual_padding
     local key_end = key_start + key_width
     
     -- Icon highlight (teal/cyan like luxdash menu icons)
@@ -575,6 +571,9 @@ function M._add_shortcuts_content_with_highlights(lines, highlights)
     })
     
     -- Key highlight (yellow bold like luxdash menu keys)
+    -- DEBUG: Print position info
+    print(string.format("Regular item '%s': key_start=%d, key_end=%d, text_end=%d, padding_needed=%d", 
+      item.label, key_start, key_end, text_end, padding_needed))
     table.insert(highlights, {
       line = line_num,
       col_start = key_start,
@@ -587,36 +586,54 @@ function M._add_shortcuts_content_with_highlights(lines, highlights)
     table.insert(lines, "")
   end
   
-  -- Add close option
+  -- Add close option (using exact same pattern as regular menu items)
   local line_num = #lines
-  local close_line = "  󰅖  Close                    [Esc]"
-  table.insert(lines, close_line)
+  local close_item = { icon = "󰅖", label = "Close", key = "[Esc]" }
+  local line_content = "  " .. close_item.icon .. "  " .. close_item.label
   
-  -- Highlight close option parts
-  local close_icon_end = 2 + vim.fn.strdisplaywidth("󰅖")
-  local close_text_start = close_icon_end + 2
-  local close_text_end = close_text_start + vim.fn.strdisplaywidth("Close")
-  local close_key_start = vim.fn.strdisplaywidth("  󰅖  Close                    ")
-  local close_key_end = vim.fn.strdisplaywidth(close_line)
+  -- Calculate padding to align keys to the right (identical to regular menu items)
+  local target_width = 30
+  local content_width = vim.fn.strdisplaywidth(line_content)
+  local key_width = vim.fn.strdisplaywidth(close_item.key)
+  local padding_needed = target_width - content_width - key_width
+  local actual_padding = math.max(1, padding_needed - 6)  -- Reduce by 6 to align [ with regular items
+  local padding = string.rep(" ", actual_padding)
+  
+  local full_line = line_content .. padding .. close_item.key
+  table.insert(lines, full_line)
+  
+  -- DEBUG: Print line content info
+  print(string.format("Close: line='%s', content_width=%d, padding_needed=%d", 
+    full_line, content_width, padding_needed))
+  
+  -- Add highlights for icon, text, and key separately (identical to regular menu items)
+  local icon_end = 2 + vim.fn.strdisplaywidth(close_item.icon)
+  local text_start = icon_end + 2
+  local text_end = text_start + vim.fn.strdisplaywidth(close_item.label)
+  local key_start = text_end + actual_padding
+  local key_end = key_start + key_width
   
   table.insert(highlights, {
     line = line_num,
     col_start = 2,
-    col_end = close_icon_end,
+    col_end = icon_end,
     hl_group = "LuxtermMenuIcon"
   })
   
   table.insert(highlights, {
     line = line_num,
-    col_start = close_text_start,
-    col_end = close_text_end,
+    col_start = text_start,
+    col_end = text_end,
     hl_group = "LuxtermMenuText"
   })
   
+  -- DEBUG: Print position info for close option
+  print(string.format("Close option: key_start=%d, key_end=%d, text_end=%d, padding_needed=%d", 
+    key_start, key_end, text_end, padding_needed))
   table.insert(highlights, {
     line = line_num,
-    col_start = close_key_start,
-    col_end = close_key_end,
+    col_start = key_start,
+    col_end = key_end,
     hl_group = "LuxtermMenuKey"
   })
 end
