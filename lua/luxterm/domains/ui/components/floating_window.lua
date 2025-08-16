@@ -137,45 +137,6 @@ function M.update_window_content(winid, lines, opts)
   return true
 end
 
-function M.resize_window(winid, new_width, new_height)
-  if not vim.api.nvim_win_is_valid(winid) then
-    return false
-  end
-  
-  local config = vim.api.nvim_win_get_config(winid)
-  config.width = new_width
-  config.height = new_height
-  
-  vim.api.nvim_win_set_config(winid, config)
-  
-  local window_data = M.windows[winid]
-  if window_data then
-    window_data.config.width = new_width
-    window_data.config.height = new_height
-  end
-  
-  return true
-end
-
-function M.move_window(winid, new_row, new_col)
-  if not vim.api.nvim_win_is_valid(winid) then
-    return false
-  end
-  
-  local config = vim.api.nvim_win_get_config(winid)
-  config.row = new_row
-  config.col = new_col
-  
-  vim.api.nvim_win_set_config(winid, config)
-  
-  local window_data = M.windows[winid]
-  if window_data then
-    window_data.config.row = new_row
-    window_data.config.col = new_col
-  end
-  
-  return true
-end
 
 function M.focus_window(winid)
   if vim.api.nvim_win_is_valid(winid) then
@@ -200,17 +161,6 @@ function M.get_window_info(winid)
   }
 end
 
-function M.get_all_windows()
-  local valid_windows = {}
-  for winid, window_data in pairs(M.windows) do
-    if vim.api.nvim_win_is_valid(winid) then
-      table.insert(valid_windows, M.get_window_info(winid))
-    else
-      M.windows[winid] = nil
-    end
-  end
-  return valid_windows
-end
 
 function M.close_all_windows()
   for winid in pairs(M.windows) do
@@ -247,23 +197,6 @@ function M.create_split_layout(base_config, left_config, right_config)
     left = { winid = left_winid, bufnr = left_bufnr },
     right = { winid = right_winid, bufnr = right_bufnr }
   }
-end
-
-function M.setup_window_autocmds(winid, autocmds)
-  local window_data = M.windows[winid]
-  if not window_data then
-    return false
-  end
-  
-  for event, callback in pairs(autocmds) do
-    vim.api.nvim_create_autocmd(event, {
-      pattern = tostring(winid),
-      callback = callback,
-      once = event == "WinClosed"
-    })
-  end
-  
-  return true
 end
 
 function M.calculate_centered_position(width, height)

@@ -154,20 +154,16 @@ function M._add_terminal_content(lines)
     return
   end
   
-  -- Get raw terminal content first
   local raw_lines = vim.api.nvim_buf_get_lines(M.current_session.bufnr, 0, -1, false)
   
-  -- Remove empty lines from the end
   while #raw_lines > 0 and raw_lines[#raw_lines] == "" do
     table.remove(raw_lines)
   end
   
-  -- Limit to max lines (take the last N lines)
   if #raw_lines > M.config.max_lines then
     raw_lines = vim.list_slice(raw_lines, #raw_lines - M.config.max_lines + 1, #raw_lines)
   end
   
-  -- Simple content check: do we have any lines with content?
   local has_meaningful_content = false
   for _, line in ipairs(raw_lines) do
     if line and line:match("%S") then -- Contains non-whitespace characters
@@ -176,7 +172,6 @@ function M._add_terminal_content(lines)
     end
   end
   
-  -- For newly created terminals without content yet
   if not has_meaningful_content then
     if M.current_session.created_at then
       local time_since_creation = vim.loop.now() - M.current_session.created_at
@@ -185,7 +180,6 @@ function M._add_terminal_content(lines)
         table.insert(lines, "")
         table.insert(lines, "  Waiting for shell prompt...")
         
-        -- Schedule a single refresh
         if not M.loading_refresh_scheduled then
           M.loading_refresh_scheduled = true
           vim.defer_fn(function()
@@ -200,14 +194,12 @@ function M._add_terminal_content(lines)
     return
   end
   
-  -- We have content, so display it (with minimal ANSI cleaning)
   local window_width = 80
   if M.window_id and vim.api.nvim_win_is_valid(M.window_id) then
     window_width = vim.api.nvim_win_get_width(M.window_id) - 2
   end
   
   for _, line in ipairs(raw_lines) do
-    -- Basic ANSI cleaning but preserve structure
     local cleaned_line = line:gsub("\27%[[%d;]*[mK]", "")
     cleaned_line = cleaned_line:gsub("[\1-\8\11\12\14-\31\127]", "")
     
@@ -304,7 +296,6 @@ end
 function M.is_visible()
   return M.window_id and vim.api.nvim_win_is_valid(M.window_id)
 end
-
 
 function M.preload_content(session)
   if session and session.bufnr then

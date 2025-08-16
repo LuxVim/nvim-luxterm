@@ -10,26 +10,21 @@ local M = {}
 function M.execute(params)
   params = params or {}
   
-  -- Ensure we're not in terminal mode first
   if vim.fn.mode() == 't' then
     vim.cmd('stopinsert')
   end
   
-  -- If manager is already open, close it
   if layout_manager.is_manager_open() then
     return M._close_manager(params)
   end
   
-  -- Check for active session layout right before we need it
   local active_layout = layout_manager.get_active_layout()
   
-  -- If we have an active session layout, close it and return (true toggle behavior)
   if active_layout and active_layout.type == "session" then
     local success = layout_manager.close_layout(active_layout.id)
     return success, "session_closed"
   end
   
-  -- Only open the manager if nothing else is open
   return M._open_manager(params)
 end
 
@@ -50,7 +45,6 @@ function M._open_manager(params)
   local active_session = session_manager.get_active_session()
   
   
-  -- If no sessions exist, don't auto-create one - just show empty manager
   if #sessions == 0 then
     active_session = nil
   elseif #sessions > 0 and not active_session then
@@ -61,7 +55,6 @@ function M._open_manager(params)
   M._setup_manager_components(layout, sessions, active_session)
   M._setup_manager_event_handlers(layout_id)
   
-  -- Ensure the session list gets focus and forces a refresh
   if layout and layout.windows and layout.windows.left and layout.windows.left.winid then
     local left_winid = layout.windows.left.winid
     if vim.api.nvim_win_is_valid(left_winid) then
@@ -103,13 +96,11 @@ function M._setup_manager_components(layout, sessions, active_session)
   session_list.update_sessions(sessions, active_session and active_session.id or nil)
   session_list.render()
   
-  -- Set up preview pane for the currently selected session
   local selected_session = session_list.get_selected_session()
   if selected_session and selected_session:is_valid() then
     preview_pane.set_session(selected_session)
     preview_pane.preload_content(selected_session)
   else
-    -- Explicitly clear the preview pane when no valid session exists
     preview_pane.set_session(nil)
   end
   preview_pane.render()
@@ -276,17 +267,6 @@ function M.close_manager(params)
   end
   
   return M._close_manager(params)
-end
-
-function M.is_manager_open()
-  return layout_manager.is_manager_open()
-end
-
-function M.focus_manager()
-  if layout_manager.is_manager_open() then
-    return layout_manager.focus_session_list()
-  end
-  return false
 end
 
 function M.get_manager_state()

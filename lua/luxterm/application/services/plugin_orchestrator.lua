@@ -72,7 +72,6 @@ function M._setup_domain_services()
     storage_file = M.config.persistence.storage_file
   })
   
-  -- Setup UI components
   local session_list = require("luxterm.domains.ui.components.session_list")
   local preview_pane = require("luxterm.domains.ui.components.preview_pane")
   local floating_window = require("luxterm.domains.ui.components.floating_window")

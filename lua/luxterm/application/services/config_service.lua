@@ -178,42 +178,4 @@ function M.get_default_session_name(config)
   return string.format(config.session_name_template, lowest_number)
 end
 
-function M.merge_layout_config(config, user_layout_config)
-  local layout_config = {
-    manager_width = config.manager_width,
-    manager_height = config.manager_height,
-    left_pane_width = config.left_pane_width,
-    border = config.border
-  }
-  
-  return vim.tbl_deep_extend("force", layout_config, user_layout_config or {})
-end
-
-function M.get_render_config(config)
-  return {
-    preview_enabled = config.preview_enabled,
-    preview_max_lines = config.preview_max_lines,
-    preview_refresh_ms = config.preview_refresh_ms,
-    lazy_render = config.performance.lazy_render
-  }
-end
-
-function M.get_performance_config(config)
-  return {
-    cache_enabled = config.performance.cache_enabled,
-    batch_delay_ms = config.performance.batch_delay_ms,
-    refresh_rate = config.performance.refresh_rate,
-    min_debounce_delay = config.performance.min_debounce_delay
-  }
-end
-
-function M.should_auto_close(config)
-  return config.auto_close
-end
-
-function M.should_focus_on_create(config)
-  return config.focus_on_create
-end
-
-
 return M

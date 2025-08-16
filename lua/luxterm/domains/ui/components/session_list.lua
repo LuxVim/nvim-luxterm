@@ -20,7 +20,6 @@ function M.setup(opts)
   opts = opts or {}
   M.render_config = vim.tbl_deep_extend("force", M.render_config, opts.render_config or {})
   
-  -- Setup highlight groups for border highlighting
   M._setup_highlight_groups()
   
   cache_coordinator.register_cache_layer("session_list", require("luxterm.infrastructure.cache.render_cache"))
@@ -168,11 +167,9 @@ function M.render()
   
   floating_window.update_window_content(M.window_id, content_data.lines)
   
-  -- Force flush the api_adapter batch operations immediately
   local api_adapter = require("luxterm.infrastructure.nvim.api_adapter")
   api_adapter.flush_now()
   
-  -- Now apply highlights after content is updated
   M._apply_highlights(content_data.highlights)
   
   return true
@@ -723,6 +720,5 @@ end
 function M.is_visible()
   return M.window_id and vim.api.nvim_win_is_valid(M.window_id)
 end
-
 
 return M

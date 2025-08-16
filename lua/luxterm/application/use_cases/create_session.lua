@@ -46,8 +46,6 @@ function M.execute_and_open_floating(params)
     return nil, error_msg
   end
   
-  -- The floating window is already created in M.execute() via _open_session_in_floating_window
-  -- No need to create it again here
   
   return session, nil
 end

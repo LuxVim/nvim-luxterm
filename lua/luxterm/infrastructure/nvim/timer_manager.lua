@@ -64,7 +64,6 @@ function M.stop_timer(timer_id)
   
   timer_data.active = false
   
-  -- Only stop if it's a regular timer (has timer field)
   if timer_data.timer then
     pcall(function()
       timer_data.timer:stop()
@@ -82,7 +81,6 @@ function M.destroy_timer(timer_id)
   
   timer_data.active = false
   
-  -- Handle regular timers (with timer field)
   if timer_data.timer then
     pcall(function()
       if not timer_data.timer:is_closing() then
@@ -92,7 +90,6 @@ function M.destroy_timer(timer_id)
     end)
   end
   
-  -- Handle event-driven timers (with unsubscribe field)
   if timer_data.unsubscribe then
     pcall(timer_data.unsubscribe)
   end
@@ -128,18 +125,6 @@ function M.debounce(debounce_id, callback, delay_ms)
   end))
   
   return true
-end
-
-function M.schedule_ui_refresh()
-  M.debounce("ui_refresh", function()
-    event_bus.emit(event_types.UI_REFRESH_REQUESTED)
-  end)
-end
-
-function M.schedule_content_update(session_id)
-  M.debounce("content_update_" .. session_id, function()
-    event_bus.emit(event_types.SESSION_CONTENT_CHANGED, { session_id = session_id })
-  end, 100)
 end
 
 function M.create_event_driven_refresh(timer_id, event_type, callback)

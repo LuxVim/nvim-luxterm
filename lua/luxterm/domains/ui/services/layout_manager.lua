@@ -106,7 +106,6 @@ function M._setup_layout_components(layout)
   preview_pane.window_id = layout.windows.right.winid
   preview_pane.buffer_id = layout.windows.right.bufnr
   
-  -- Hide cursor in manager windows
   vim.api.nvim_win_call(layout.windows.left.winid, function()
     vim.opt_local.guicursor = "a:block-NONE"
   end)
@@ -161,10 +160,8 @@ end
 function M.create_session_window_layout(session, config)
   config = vim.tbl_deep_extend("force", M.default_config, config or {})
   
-  -- Ensure we have a valid terminal buffer
   local terminal_bufnr = session.bufnr
   if not session:is_valid() then
-    -- Create a new terminal buffer if the session doesn't have a valid one
     terminal_bufnr = vim.api.nvim_create_buf(false, true)
     vim.bo[terminal_bufnr].buftype = 'terminal'
     vim.fn.termopen(vim.o.shell, { buffer = terminal_bufnr })
@@ -187,7 +184,6 @@ function M.create_session_window_layout(session, config)
     bufnr = terminal_bufnr,
     zindex = 100,
     on_create = function(winid, bufnr)
-      -- Ensure we're really in terminal mode
       vim.api.nvim_set_current_win(winid)
       vim.api.nvim_set_current_buf(bufnr)
       M._setup_session_window_keymaps(winid, bufnr)
@@ -273,7 +269,6 @@ function M._close_manager_layout(layout)
     pcall(vim.api.nvim_del_autocmd, layout.focus_autocmd)
   end
   
-  -- Clean up event handlers stored in the layout
   if layout.cleanup_handlers then
     for _, cleanup in ipairs(layout.cleanup_handlers) do
       cleanup()
@@ -285,7 +280,6 @@ function M._close_manager_layout(layout)
     layout_id = layout.id
   })
   
-  -- Trigger User autocmd for legacy cleanup mechanisms
   vim.api.nvim_exec_autocmds("User", {
     pattern = "LuxtermManagerClosed"
   })
@@ -321,45 +315,11 @@ function M.focus_session_list()
   return false
 end
 
-function M.focus_preview_pane()
-  local layout = M.get_active_layout()
-  if layout and layout.type == "manager" and layout.windows.right then
-    return floating_window.focus_window(layout.windows.right.winid)
-  end
-  return false
-end
-
-function M.resize_layout(layout_id, new_width, new_height)
-  local layout = M.layouts[layout_id]
-  if not layout then
-    return false
-  end
-  
-  if layout.type == "manager" and layout.windows then
-    local left_width = math.floor(new_width * layout.config.left_pane_width)
-    local right_width = new_width - left_width
-    
-    if layout.windows.left and layout.windows.left.winid then
-      floating_window.resize_window(layout.windows.left.winid, left_width, new_height)
-    end
-    
-    if layout.windows.right and layout.windows.right.winid then
-      floating_window.resize_window(layout.windows.right.winid, right_width, new_height)
-      local left_config = vim.api.nvim_win_get_config(layout.windows.left.winid)
-      floating_window.move_window(layout.windows.right.winid, left_config.row, left_config.col + left_width)
-    end
-  elseif layout.type == "session" and layout.window_id then
-    floating_window.resize_window(layout.window_id, new_width, new_height)
-  end
-  
-  return true
-end
 
 function M.close_all_layouts()
   for layout_id in pairs(M.layouts) do
     M.close_layout(layout_id)
   end
 end
-
 
 return M
