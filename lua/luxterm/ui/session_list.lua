@@ -32,8 +32,13 @@ function M.create_window(config)
   
   -- Create buffer
   M.buffer_id = vim.api.nvim_create_buf(false, true)
+  -- Set buffer options
   vim.api.nvim_buf_set_option(M.buffer_id, "filetype", "luxterm_main")
   vim.api.nvim_buf_set_option(M.buffer_id, "bufhidden", "wipe")
+  vim.api.nvim_buf_set_option(M.buffer_id, "swapfile", false)
+  vim.api.nvim_buf_set_option(M.buffer_id, "buftype", "nofile")
+  -- Only set modifiable to false, don't set readonly (causes conflicts)
+  vim.api.nvim_buf_set_option(M.buffer_id, "modifiable", false)
   
   -- Calculate window size
   local width = math.floor(vim.o.columns * 0.4)
@@ -54,6 +59,23 @@ function M.create_window(config)
     style = "minimal"
   })
   
+  -- Hide cursor in the window
+  vim.api.nvim_win_set_option(M.window_id, "cursorline", false)
+  vim.api.nvim_win_set_option(M.window_id, "cursorcolumn", false)
+  -- Set cursor to invisible when in this window
+  vim.api.nvim_create_autocmd("WinEnter", {
+    buffer = M.buffer_id,
+    callback = function()
+      vim.opt.guicursor:append("a:hor1-Cursor/lCursor")
+    end
+  })
+  vim.api.nvim_create_autocmd("WinLeave", {
+    buffer = M.buffer_id,
+    callback = function()
+      vim.opt.guicursor = "n-v-c-sm:block,i-ci-ve:ver25,r-cr-o:hor20"
+    end
+  })
+  
   M.setup_keymaps()
   M.setup_autocmds()
   
@@ -68,13 +90,14 @@ function M.destroy()
   M.buffer_id = nil
 end
 
-function M.update_sessions(sessions, active_session_id)
+function M.update_sessions(sessions, active_session_id, preserve_selection_position)
   M.sessions_data = sessions or {}
   M.active_session_id = active_session_id
   
   -- Ensure valid selection
   if #M.sessions_data > 0 then
-    if M.active_session_id then
+    -- Only jump to active session if we're not preserving selection position
+    if M.active_session_id and not preserve_selection_position then
       for i, session in ipairs(M.sessions_data) do
         if session.id == M.active_session_id then
           M.selected_session_index = i
@@ -97,7 +120,10 @@ function M.render()
   
   local lines, highlights = M.generate_content()
   
+  -- Temporarily enable modifiable to update content
+  vim.api.nvim_buf_set_option(M.buffer_id, "modifiable", true)
   vim.api.nvim_buf_set_lines(M.buffer_id, 0, -1, false, lines)
+  vim.api.nvim_buf_set_option(M.buffer_id, "modifiable", false)
   
   -- Apply highlights
   local ns_id = vim.api.nvim_create_namespace("luxterm_session_list")

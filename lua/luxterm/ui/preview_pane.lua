@@ -15,10 +15,32 @@ function M.create_window(winid, bufnr)
   
   -- Set buffer properties
   if M.buffer_id and vim.api.nvim_buf_is_valid(M.buffer_id) then
+    -- Set buffer options
     vim.api.nvim_buf_set_option(M.buffer_id, "buftype", "nofile")
     vim.api.nvim_buf_set_option(M.buffer_id, "swapfile", false)
     vim.api.nvim_buf_set_option(M.buffer_id, "bufhidden", "wipe")
     vim.api.nvim_buf_set_option(M.buffer_id, "filetype", "luxterm_preview")
+    -- Only set modifiable to false, don't set readonly (causes conflicts)
+    vim.api.nvim_buf_set_option(M.buffer_id, "modifiable", false)
+  end
+  
+  -- Hide cursor in the preview window
+  if M.window_id and vim.api.nvim_win_is_valid(M.window_id) then
+    vim.api.nvim_win_set_option(M.window_id, "cursorline", false)
+    vim.api.nvim_win_set_option(M.window_id, "cursorcolumn", false)
+    -- Set cursor to invisible when in this window
+    vim.api.nvim_create_autocmd("WinEnter", {
+      buffer = M.buffer_id,
+      callback = function()
+        vim.opt.guicursor:append("a:hor1-Cursor/lCursor")
+      end
+    })
+    vim.api.nvim_create_autocmd("WinLeave", {
+      buffer = M.buffer_id,
+      callback = function()
+        vim.opt.guicursor = "n-v-c-sm:block,i-ci-ve:ver25,r-cr-o:hor20"
+      end
+    })
   end
   
   M.setup_highlights()
@@ -111,7 +133,9 @@ function M.update_preview(session)
   end
   
   -- Update buffer content
+  vim.api.nvim_buf_set_option(M.buffer_id, "modifiable", true)
   vim.api.nvim_buf_set_lines(M.buffer_id, 0, -1, false, lines)
+  vim.api.nvim_buf_set_option(M.buffer_id, "modifiable", false)
   
   -- Apply highlights
   local ns_id = vim.api.nvim_create_namespace("luxterm_preview")

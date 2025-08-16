@@ -343,7 +343,7 @@ function M.is_manager_open()
   return M.manager_layout ~= nil
 end
 
-function M.refresh_manager()
+function M.refresh_manager(preserve_selection_position)
   if not M.is_manager_open() then
     return
   end
@@ -352,7 +352,7 @@ function M.refresh_manager()
   local active_session = session_manager.get_active_session()
   local active_id = active_session and active_session.id or nil
   
-  session_list.update_sessions(sessions, active_id)
+  session_list.update_sessions(sessions, active_id, preserve_selection_position)
   
   if M.config.preview_enabled and preview_pane.is_visible() then
     local selected = session_list.get_selected_session()
@@ -409,7 +409,7 @@ function M.delete_session(session_id, opts)
   if success then
     events.emit(events.SESSION_DELETED, {session_id = session_id})
     if M.is_manager_open() then
-      M.refresh_manager()
+      M.refresh_manager(true)  -- Preserve selection position after deletion
     end
   end
   
@@ -438,7 +438,7 @@ function M.delete_sessions_by_pattern(pattern)
     events.emit(events.SESSION_DELETED, {session_id = session.id})
   end
   if M.is_manager_open() then
-    M.refresh_manager()
+    M.refresh_manager(true)  -- Preserve selection position after deletion
   end
   return deleted
 end
