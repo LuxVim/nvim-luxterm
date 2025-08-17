@@ -525,8 +525,12 @@ function M.rename_selected_session()
     return false
   end
   
-  vim.ui.input({prompt = "New session name: ", default = session.name}, function(new_name)
+  vim.ui.input({prompt = "New session name (max 12 chars): ", default = session.name}, function(new_name)
     if new_name and new_name ~= "" and new_name ~= session.name then
+      -- Limit to 12 characters
+      if #new_name > 12 then
+        new_name = string.sub(new_name, 1, 12)
+      end
       session.name = new_name
       events.emit(events.SESSION_RENAMED, {session = session})
       

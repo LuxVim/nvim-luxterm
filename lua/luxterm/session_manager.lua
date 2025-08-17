@@ -123,9 +123,15 @@ local function create_session(opts)
   
   local session_number = find_lowest_session_number()
   
+  -- Limit session names to 12 characters
+  local name = opts.name or ("Session " .. session_number)
+  if #name > 12 then
+    name = string.sub(name, 1, 12)
+  end
+  
   local session = {
     id = tostring(M.next_id),
-    name = opts.name or ("Session " .. session_number),
+    name = name,
     bufnr = opts.bufnr,
     created_at = vim.loop.now(),
     last_accessed = vim.loop.now()

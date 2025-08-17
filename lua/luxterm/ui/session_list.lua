@@ -196,7 +196,7 @@ function M.add_session_content(lines, highlights, session, index)
   
   -- Get session info
   local status_icon = M.get_status_icon(session)
-  local name = M.truncate_name(session.name, 18)
+  local name = M.truncate_name(session.name, 12)  -- Names are already limited to 12 chars
   local status_text = session:get_status()
   
   -- Use list position for hotkey (consistent with keymap behavior)
