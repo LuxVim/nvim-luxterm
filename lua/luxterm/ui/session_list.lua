@@ -10,13 +10,14 @@ local M = {
 -- Highlight groups setup
 function M.setup_highlights()
   vim.api.nvim_set_hl(0, "LuxtermSessionIcon", {fg = "#ff7801"})
-  vim.api.nvim_set_hl(0, "LuxtermSessionName", {fg = "#d4d4d4"})
+  vim.api.nvim_set_hl(0, "LuxtermSessionName", {fg = "#ffffff"})  -- White for session names
+  vim.api.nvim_set_hl(0, "LuxtermSessionNameSelected", {fg = "#ffffff", bold = true})  -- White for selected session names
   vim.api.nvim_set_hl(0, "LuxtermSessionKey", {fg = "#db2dee", bold = true})
   vim.api.nvim_set_hl(0, "LuxtermMenuIcon", {fg = "#4ec9b0"})
   vim.api.nvim_set_hl(0, "LuxtermMenuText", {fg = "#d4d4d4"})
   vim.api.nvim_set_hl(0, "LuxtermMenuKey", {fg = "#db2dee", bold = true})
-  vim.api.nvim_set_hl(0, "LuxtermSessionSelected", {fg = "#FFA500", bold = true})
-  vim.api.nvim_set_hl(0, "LuxtermSessionNormal", {fg = "#6B6B6B"})
+  vim.api.nvim_set_hl(0, "LuxtermSessionSelected", {fg = "#FFA500", bold = true})  -- Orange for selected borders/text
+  vim.api.nvim_set_hl(0, "LuxtermSessionNormal", {fg = "#6B6B6B"})  -- Gray for unselected borders
 end
 
 function M.setup(opts)
@@ -163,12 +164,23 @@ function M.render()
   -- Ensure buffer is locked again after content update
   vim.api.nvim_buf_set_option(M.buffer_id, "modifiable", false)
   
-  -- Apply highlights
+  -- Apply highlights using extmarks with priority for better control
   local ns_id = vim.api.nvim_create_namespace("luxterm_session_list")
   vim.api.nvim_buf_clear_namespace(M.buffer_id, ns_id, 0, -1)
   
   for _, hl in ipairs(highlights) do
-    vim.api.nvim_buf_add_highlight(M.buffer_id, ns_id, hl.group, hl.line, hl.col_start, hl.col_end)
+    if hl.priority then
+      -- Use extmark for priority control
+      vim.api.nvim_buf_set_extmark(M.buffer_id, ns_id, hl.line, hl.col_start, {
+        end_col = hl.col_end == -1 and nil or hl.col_end,
+        end_line = hl.line,
+        hl_group = hl.group,
+        priority = hl.priority
+      })
+    else
+      -- Use regular highlight for non-priority items
+      vim.api.nvim_buf_add_highlight(M.buffer_id, ns_id, hl.group, hl.line, hl.col_start, hl.col_end)
+    end
   end
 end
 
@@ -234,42 +246,114 @@ function M.add_session_content(lines, highlights, session, index)
   table.insert(lines, bottom_border)
   table.insert(lines, "")
   
-  -- Add highlights
-  for i = 0, 3 do
+  -- Calculate byte positions for highlighting
+  -- "  ╭ " = 2 spaces + ╭ (3 bytes) + 1 space = 6 bytes total
+  local prefix = "  ╭ "
+  local prefix_bytes = string.len(prefix)  -- This gives us the byte count
+  local name_bytes = string.len(name)
+  
+  -- Highlight session name with HIGH priority to ensure it takes precedence
+  local name_hl_group = is_selected and "LuxtermSessionNameSelected" or "LuxtermSessionName"
+  table.insert(highlights, {
+    line = line_num,
+    col_start = prefix_bytes,  -- Start after the prefix
+    col_end = prefix_bytes + name_bytes,  -- End after the name
+    group = name_hl_group,
+    priority = 100  -- High priority to override border highlights
+  })
+  
+  -- Add border highlights (only the actual border characters, not the content)
+  -- Top border: highlight the box drawing characters and padding
+  table.insert(highlights, {
+    line = line_num,
+    col_start = 0,
+    col_end = prefix_bytes,  -- Just the prefix part
+    group = border_hl
+  })
+  -- Highlight the border after the name (space + border chars)
+  table.insert(highlights, {
+    line = line_num,
+    col_start = prefix_bytes + name_bytes + 1,  -- After prefix + name + space
+    col_end = -1,  -- Rest of the border
+    group = border_hl
+  })
+  
+  -- Middle lines: highlight the border characters only
+  local side_prefix = "  │ "  -- 2 spaces + │ (3 bytes) + 1 space = 6 bytes
+  local side_prefix_bytes = string.len(side_prefix)
+  local side_suffix = " │"  -- 1 space + │ (3 bytes) = 4 bytes
+  local side_suffix_bytes = string.len(side_suffix)
+  
+  for i = 1, 2 do
     table.insert(highlights, {
       line = line_num + i,
       col_start = 0,
+      col_end = side_prefix_bytes,  -- Just the "  │ " part
+      group = border_hl
+    })
+    table.insert(highlights, {
+      line = line_num + i,
+      col_start = string.len(lines[line_num + i + 1]) - side_suffix_bytes,  -- Just the ending " │"
       col_end = -1,
       group = border_hl
     })
   end
   
-  -- Highlight session name
+  -- Bottom border: highlight entire line
   table.insert(highlights, {
-    line = line_num,
-    col_start = 4,
-    col_end = 4 + vim.fn.strdisplaywidth(name),
-    group = "LuxtermSessionName"
+    line = line_num + 3,
+    col_start = 0,
+    col_end = -1,
+    group = border_hl
   })
   
-  -- Highlight status icon
+  -- Highlight status icon (orange when selected, default otherwise)
+  local icon_hl_group = is_selected and "LuxtermSessionSelected" or "LuxtermSessionIcon"
+  local status_icon_bytes = string.len(status_icon)
   table.insert(highlights, {
     line = line_num + 1,
-    col_start = 4,
-    col_end = 4 + vim.fn.strdisplaywidth(status_icon),
-    group = "LuxtermSessionIcon"
+    col_start = side_prefix_bytes,
+    col_end = side_prefix_bytes + status_icon_bytes,
+    group = icon_hl_group
   })
   
-  -- Highlight hotkey
+  -- Highlight status text (orange when selected, gray otherwise)
+  local status_text_hl = is_selected and "LuxtermSessionSelected" or "LuxtermSessionNormal"
+  table.insert(highlights, {
+    line = line_num + 1,
+    col_start = side_prefix_bytes + status_icon_bytes + 1,  -- After icon + space
+    col_end = string.len(lines[line_num + 2]) - side_suffix_bytes,  -- Up to the border
+    group = status_text_hl
+  })
+  
+  -- Highlight hotkey line text (orange when selected, gray otherwise)
+  local hotkey_text_hl = is_selected and "LuxtermSessionSelected" or "LuxtermSessionNormal"
   local key_pattern = "%[%d+%]"
-  local _, key_end = string.find(hotkey_line, key_pattern)
-  if key_end then
-    local key_start = string.find(hotkey_line, key_pattern)
+  local key_start_pos = string.find(hotkey_line, key_pattern)
+  if key_start_pos then
+    -- Highlight "Press " part (accounting for the prefix)
     table.insert(highlights, {
       line = line_num + 2,
-      col_start = key_start - 1,
+      col_start = side_prefix_bytes,
+      col_end = key_start_pos - 1,  -- Up to the key
+      group = hotkey_text_hl
+    })
+    
+    -- Highlight the key itself (always purple)
+    local _, key_end = string.find(hotkey_line, key_pattern)
+    table.insert(highlights, {
+      line = line_num + 2,
+      col_start = key_start_pos - 1,
       col_end = key_end,
       group = "LuxtermSessionKey"
+    })
+    
+    -- Highlight " to open" part
+    table.insert(highlights, {
+      line = line_num + 2,
+      col_start = key_end,
+      col_end = string.len(lines[line_num + 3]) - side_suffix_bytes,  -- Up to the border
+      group = hotkey_text_hl
     })
   end
 end
