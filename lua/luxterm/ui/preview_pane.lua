@@ -1,4 +1,7 @@
 -- Simplified preview pane component
+local highlights = require("luxterm.ui.highlights")
+local buffer_protection = require("luxterm.ui.buffer_protection")
+
 local M = {
   window_id = nil,
   buffer_id = nil,
@@ -6,51 +9,24 @@ local M = {
 }
 
 function M.setup(opts)
-  -- Setup is minimal
+  highlights.setup_preview_highlights()
 end
 
 function M.create_window(winid, bufnr)
   M.window_id = winid
   M.buffer_id = bufnr
   
-  -- Set buffer properties
+  -- Apply buffer protection and cursor hiding using shared utilities
   if M.buffer_id and vim.api.nvim_buf_is_valid(M.buffer_id) then
-    -- Set buffer options
-    vim.api.nvim_buf_set_option(M.buffer_id, "buftype", "nofile")
-    vim.api.nvim_buf_set_option(M.buffer_id, "swapfile", false)
-    vim.api.nvim_buf_set_option(M.buffer_id, "bufhidden", "wipe")
-    vim.api.nvim_buf_set_option(M.buffer_id, "filetype", "luxterm_preview")
-    -- Only set modifiable to false, don't set readonly (causes conflicts)
+    -- Set buffer options that aren't handled by the window factory
     vim.api.nvim_buf_set_option(M.buffer_id, "modifiable", false)
   end
   
-  -- Hide cursor in the preview window
   if M.window_id and vim.api.nvim_win_is_valid(M.window_id) then
-    vim.api.nvim_win_set_option(M.window_id, "cursorline", false)
-    vim.api.nvim_win_set_option(M.window_id, "cursorcolumn", false)
-    -- Set cursor to invisible when in this window
-    vim.api.nvim_create_autocmd("WinEnter", {
-      buffer = M.buffer_id,
-      callback = function()
-        vim.opt.guicursor:append("a:hor1-Cursor/lCursor")
-      end
-    })
-    vim.api.nvim_create_autocmd("WinLeave", {
-      buffer = M.buffer_id,
-      callback = function()
-        vim.opt.guicursor = "n-v-c-sm:block,i-ci-ve:ver25,r-cr-o:hor20"
-      end
-    })
+    buffer_protection.setup_cursor_hiding(M.window_id, M.buffer_id)
   end
-  
-  M.setup_highlights()
 end
 
-function M.setup_highlights()
-  vim.api.nvim_set_hl(0, "LuxtermPreviewTitle", {fg = "#4ec9b0", bold = true})
-  vim.api.nvim_set_hl(0, "LuxtermPreviewContent", {fg = "#d4d4d4"})
-  vim.api.nvim_set_hl(0, "LuxtermPreviewEmpty", {fg = "#6B6B6B", italic = true})
-end
 
 function M.update_preview(session)
   if not M.window_id or not vim.api.nvim_win_is_valid(M.window_id) then

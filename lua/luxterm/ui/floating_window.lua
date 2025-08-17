@@ -1,5 +1,53 @@
--- Simplified floating window management
+-- Unified floating window factory with enhanced configuration support
+local buffer_protection = require("luxterm.ui.buffer_protection")
+
 local M = {}
+
+-- Window type configurations
+M.window_types = {
+  session_list = {
+    relative = "editor",
+    border = "rounded",
+    title = " Sessions ",
+    title_pos = "center",
+    style = "minimal",
+    buffer_options = {
+      filetype = "luxterm_main",
+      bufhidden = "wipe",
+      swapfile = false,
+      buftype = "nofile",
+      modifiable = false
+    },
+    protected = true,
+    hide_cursor = true
+  },
+  
+  preview = {
+    relative = "editor", 
+    border = "rounded",
+    title = " Preview ",
+    title_pos = "center",
+    style = "minimal",
+    buffer_options = {
+      filetype = "luxterm_preview",
+      bufhidden = "wipe",
+      swapfile = false,
+      buftype = "nofile",
+      modifiable = false
+    },
+    hide_cursor = true
+  },
+  
+  session_terminal = {
+    relative = "editor",
+    border = "rounded",
+    title_pos = "center",
+    style = "minimal",
+    zindex = 100,
+    enter = true,
+    terminal_keymaps = true
+  }
+}
 
 function M.create_window(config)
   config = config or {}
@@ -52,6 +100,16 @@ function M.create_window(config)
     end
   end
   
+  -- Apply buffer protection if requested
+  if config.protected then
+    buffer_protection.setup_protection(bufnr)
+  end
+  
+  -- Hide cursor if requested
+  if config.hide_cursor then
+    buffer_protection.setup_cursor_hiding(winid, bufnr)
+  end
+  
   -- Call creation callback
   if config.on_create then
     config.on_create(winid, bufnr)
@@ -67,6 +125,21 @@ function M.create_window(config)
   end
   
   return winid, bufnr
+end
+
+-- Factory method for creating windows by type
+function M.create_typed_window(window_type, overrides)
+  overrides = overrides or {}
+  
+  local base_config = M.window_types[window_type]
+  if not base_config then
+    error("Unknown window type: " .. tostring(window_type))
+  end
+  
+  -- Merge configurations with overrides taking precedence
+  local config = vim.tbl_deep_extend("force", base_config, overrides)
+  
+  return M.create_window(config)
 end
 
 function M.create_split_layout(base_config, left_config, right_config)
@@ -168,7 +241,7 @@ function M.calculate_centered_position(width, height)
   return row, col
 end
 
--- Create a session terminal window
+-- Create a session terminal window using the typed window factory
 function M.create_session_window(session, config)
   config = config or {}
   
@@ -176,17 +249,13 @@ function M.create_session_window(session, config)
   local height = config.height or math.floor(vim.o.lines * 0.8)
   local row, col = M.calculate_centered_position(width, height)
   
-  local win_config = {
+  local overrides = {
     bufnr = session.bufnr,
     width = width,
     height = height,
     row = row,
     col = col,
-    border = config.border or "rounded",
     title = " " .. (session.name or "Terminal") .. " ",
-    title_pos = "center",
-    enter = true,
-    zindex = 100,
     on_create = function(winid, bufnr)
       -- Setup terminal-specific keymaps
       local opts = {noremap = true, silent = true, buffer = bufnr}
@@ -214,7 +283,7 @@ function M.create_session_window(session, config)
     end
   }
   
-  return M.create_window(win_config)
+  return M.create_typed_window("session_terminal", overrides)
 end
 
 return M

@@ -4,6 +4,7 @@ local session_list = require("luxterm.ui.session_list")
 local preview_pane = require("luxterm.ui.preview_pane")
 local floating_window = require("luxterm.ui.floating_window")
 local events = require("luxterm.events")
+local highlights = require("luxterm.ui.highlights")
 
 local M = {
   initialized = false,
@@ -40,6 +41,7 @@ function M.setup(user_config)
   M.stats.uptime_start = vim.loop.now()
   
   -- Initialize components
+  highlights.setup_all()
   session_manager.setup_autocmds()
   session_list.setup()
   preview_pane.setup()

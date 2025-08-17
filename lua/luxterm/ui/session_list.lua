@@ -1,4 +1,7 @@
 -- Optimized session list component with borders and highlighting
+local highlights = require("luxterm.ui.highlights")
+local floating_window = require("luxterm.ui.floating_window")
+
 local M = {
   window_id = nil,
   buffer_id = nil,
@@ -7,61 +10,11 @@ local M = {
   selected_session_index = 1
 }
 
--- Highlight groups setup
-function M.setup_highlights()
-  vim.api.nvim_set_hl(0, "LuxtermSessionIcon", {fg = "#ff7801"})
-  vim.api.nvim_set_hl(0, "LuxtermSessionName", {fg = "#ffffff"})  -- White for session names
-  vim.api.nvim_set_hl(0, "LuxtermSessionNameSelected", {fg = "#ffffff", bold = true})  -- White for selected session names
-  vim.api.nvim_set_hl(0, "LuxtermSessionKey", {fg = "#db2dee", bold = true})
-  vim.api.nvim_set_hl(0, "LuxtermMenuIcon", {fg = "#4ec9b0"})
-  vim.api.nvim_set_hl(0, "LuxtermMenuText", {fg = "#d4d4d4"})
-  vim.api.nvim_set_hl(0, "LuxtermMenuKey", {fg = "#db2dee", bold = true})
-  vim.api.nvim_set_hl(0, "LuxtermSessionSelected", {fg = "#FFA500", bold = true})  -- Orange for selected borders/text
-  vim.api.nvim_set_hl(0, "LuxtermSessionNormal", {fg = "#6B6B6B"})  -- Gray for unselected borders
-  
-  -- Border highlighting - use float window background with contrasting foreground
-  vim.api.nvim_set_hl(0, "LuxtermBorderSelected", {fg = "#FFA500", bold = true})  -- Orange for selected borders
-  vim.api.nvim_set_hl(0, "LuxtermBorderNormal", {fg = "#6B6B6B"})  -- Gray for unselected borders
-end
 
 function M.setup(opts)
-  M.setup_highlights()
+  highlights.setup_session_highlights()
 end
 
-function M.setup_buffer_protection()
-  if not M.buffer_id then return end
-  
-  -- Create autocmds to prevent any modification attempts
-  local augroup = vim.api.nvim_create_augroup("LuxtermMainBufferProtection", {clear = true})
-  
-  -- Prevent insertion mode and any text modification
-  vim.api.nvim_create_autocmd({"InsertEnter", "TextChanged", "TextChangedI", "TextChangedP"}, {
-    group = augroup,
-    buffer = M.buffer_id,
-    callback = function()
-      -- Silently force back to normal mode if in insert mode
-      if vim.api.nvim_get_mode().mode:match("[iR]") then
-        vim.cmd("stopinsert")
-      end
-      return true -- prevent the event
-    end
-  })
-  
-  -- Override common editing commands
-  local opts = {noremap = true, silent = true, buffer = M.buffer_id}
-  local protected_keys = {"i", "I", "a", "A", "o", "O", "c", "C", "s", "S", "x", "X", "d", "D", "p", "P"}
-  
-  for _, key in ipairs(protected_keys) do
-    vim.keymap.set("n", key, function()
-      -- Silently ignore editing attempts
-    end, opts)
-  end
-  
-  -- Protect against paste operations
-  vim.keymap.set({"n", "v"}, "<C-v>", function()
-    -- Silently ignore paste attempts
-  end, opts)
-end
 
 function M.create_window(config)
   config = config or {}
@@ -70,52 +23,19 @@ function M.create_window(config)
     M.destroy()
   end
   
-  -- Create buffer
-  M.buffer_id = vim.api.nvim_create_buf(false, true)
-  -- Set buffer options to make it non-editable
-  vim.api.nvim_buf_set_option(M.buffer_id, "filetype", "luxterm_main")
-  vim.api.nvim_buf_set_option(M.buffer_id, "bufhidden", "wipe")
-  vim.api.nvim_buf_set_option(M.buffer_id, "swapfile", false)
-  vim.api.nvim_buf_set_option(M.buffer_id, "buftype", "nofile")
-  vim.api.nvim_buf_set_option(M.buffer_id, "modifiable", false)
-  
-  -- Additional protection: prevent any modification attempts
-  M.setup_buffer_protection()
-  
   -- Calculate window size
-  local width = math.floor(vim.o.columns * 0.25)
-  local height = math.floor(vim.o.lines * 0.6)
-  local row = math.floor((vim.o.lines - height) / 2)
-  local col = math.floor((vim.o.columns - width) / 2)
+  local width = config.width or math.floor(vim.o.columns * 0.25)
+  local height = config.height or math.floor(vim.o.lines * 0.6)
+  local row = config.row or math.floor((vim.o.lines - height) / 2)
+  local col = config.col or math.floor((vim.o.columns - width) / 2)
   
-  -- Create window
-  M.window_id = vim.api.nvim_open_win(M.buffer_id, true, {
-    relative = "editor",
+  -- Use the unified window factory
+  M.window_id, M.buffer_id = floating_window.create_typed_window("session_list", {
     width = width,
     height = height,
     row = row,
     col = col,
-    border = "rounded",
-    title = " Sessions ",
-    title_pos = "center",
-    style = "minimal"
-  })
-  
-  -- Hide cursor in the window
-  vim.api.nvim_win_set_option(M.window_id, "cursorline", false)
-  vim.api.nvim_win_set_option(M.window_id, "cursorcolumn", false)
-  -- Set cursor to invisible when in this window
-  vim.api.nvim_create_autocmd("WinEnter", {
-    buffer = M.buffer_id,
-    callback = function()
-      vim.opt.guicursor:append("a:hor1-Cursor/lCursor")
-    end
-  })
-  vim.api.nvim_create_autocmd("WinLeave", {
-    buffer = M.buffer_id,
-    callback = function()
-      vim.opt.guicursor = "n-v-c-sm:block,i-ci-ve:ver25,r-cr-o:hor20"
-    end
+    enter = true
   })
   
   M.setup_keymaps()
