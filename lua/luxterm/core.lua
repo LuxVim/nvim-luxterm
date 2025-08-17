@@ -24,6 +24,7 @@ local default_config = {
   manager_height = 0.8,
   preview_enabled = true,
   focus_on_create = false,
+  auto_hide = true,  -- Auto-hide floating windows when cursor leaves
   keymaps = {
     toggle_manager = "<C-/>",
     next_session = "<C-]>",
@@ -264,13 +265,21 @@ function M.open_manager()
       title = " Sessions ",
       width_ratio = 0.25,
       enter = true,
-      buffer_options = {filetype = "luxterm_main"}
+      buffer_options = {filetype = "luxterm_main"},
+      auto_hide = M.config.auto_hide,
+      auto_hide_callback = function(winid, bufnr)
+        M.close_manager()
+      end
     }
     
     local right_config = {
       title = " Preview ",
       enter = false,
-      buffer_options = {filetype = "luxterm_preview"}
+      buffer_options = {filetype = "luxterm_preview"},
+      auto_hide = M.config.auto_hide,
+      auto_hide_callback = function(winid, bufnr)
+        M.close_manager()
+      end
     }
     
     local windows = floating_window.create_split_layout(base_config, left_config, right_config)
@@ -292,7 +301,11 @@ function M.open_manager()
       width = total_width,
       height = total_height,
       row = row,
-      col = col
+      col = col,
+      auto_hide = M.config.auto_hide,
+      auto_hide_callback = function(winid, bufnr)
+        M.close_manager()
+      end
     })
     
     M.manager_layout = {
@@ -515,7 +528,8 @@ function M.open_session_window(session)
   
   floating_window.create_session_window(session, {
     width = math.floor(vim.o.columns * M.config.manager_width),
-    height = math.floor(vim.o.lines * M.config.manager_height)
+    height = math.floor(vim.o.lines * M.config.manager_height),
+    auto_hide = M.config.auto_hide
   })
   
   return true

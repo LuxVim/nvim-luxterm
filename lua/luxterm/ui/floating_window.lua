@@ -110,6 +110,11 @@ function M.create_window(config)
     buffer_protection.setup_cursor_hiding(winid, bufnr)
   end
   
+  -- Setup auto-hide on cursor leave if requested
+  if config.auto_hide then
+    M.setup_auto_hide(winid, bufnr, config.auto_hide_callback)
+  end
+  
   -- Call creation callback
   if config.on_create then
     config.on_create(winid, bufnr)
@@ -242,12 +247,89 @@ function M.calculate_centered_position(width, height)
 end
 
 -- Create a session terminal window using the typed window factory
+-- Auto-hide functionality for floating windows
+function M.setup_auto_hide(winid, bufnr, callback)
+  if not winid or not vim.api.nvim_win_is_valid(winid) then
+    return
+  end
+  
+  local augroup_deleted = false
+  
+  local function safe_delete_augroup(group_id)
+    if not augroup_deleted then
+      augroup_deleted = true
+      pcall(vim.api.nvim_del_augroup_by_id, group_id)
+    end
+  end
+  
+  local function should_hide()
+    -- Check if window is still valid
+    if not vim.api.nvim_win_is_valid(winid) then
+      return false
+    end
+    
+    local current_win = vim.api.nvim_get_current_win()
+    
+    -- Don't hide if we're currently in this window
+    if current_win == winid then
+      return false
+    end
+    
+    -- Don't hide if we're in another luxterm floating window
+    if M.is_floating_window(current_win) then
+      local current_buf = vim.api.nvim_win_get_buf(current_win)
+      local current_filetype = vim.api.nvim_buf_get_option(current_buf, "filetype")
+      if current_filetype:match("^luxterm") or vim.api.nvim_buf_get_option(current_buf, "buftype") == "terminal" then
+        return false
+      end
+    end
+    
+    return true
+  end
+  
+  -- Set up autocmd to detect cursor leave
+  local augroup = vim.api.nvim_create_augroup("LuxtermAutoHide_" .. winid, {clear = true})
+  
+  -- Monitor window enter/leave events
+  vim.api.nvim_create_autocmd({"WinEnter", "WinLeave", "CursorMoved", "CursorMovedI"}, {
+    group = augroup,
+    callback = function()
+      vim.defer_fn(function()
+        if should_hide() then
+          if callback then
+            callback(winid, bufnr)
+          else
+            M.close_window(winid)
+          end
+          -- Clean up the autocmd group safely
+          safe_delete_augroup(augroup)
+        end
+      end, 100) -- Small delay to prevent flickering
+    end
+  })
+  
+  -- Also clean up on window close
+  vim.api.nvim_create_autocmd("WinClosed", {
+    pattern = tostring(winid),
+    callback = function()
+      safe_delete_augroup(augroup)
+    end,
+    once = true
+  })
+end
+
 function M.create_session_window(session, config)
   config = config or {}
   
   local width = config.width or math.floor(vim.o.columns * 0.8)
   local height = config.height or math.floor(vim.o.lines * 0.8)
   local row, col = M.calculate_centered_position(width, height)
+  
+  -- Get auto_hide setting from config, defaulting to true for backwards compatibility
+  local auto_hide = config.auto_hide
+  if auto_hide == nil then
+    auto_hide = true
+  end
   
   local overrides = {
     bufnr = session.bufnr,
@@ -256,6 +338,11 @@ function M.create_session_window(session, config)
     row = row,
     col = col,
     title = " " .. (session.name or "Terminal") .. " ",
+    auto_hide = auto_hide,
+    auto_hide_callback = function(winid, bufnr)
+      -- Custom callback for session windows - just close the window
+      M.close_window(winid)
+    end,
     on_create = function(winid, bufnr)
       -- Setup terminal-specific keymaps
       local opts = {noremap = true, silent = true, buffer = bufnr}

@@ -29,13 +29,15 @@ function M.create_window(config)
   local row = config.row or math.floor((vim.o.lines - height) / 2)
   local col = config.col or math.floor((vim.o.columns - width) / 2)
   
-  -- Use the unified window factory
+  -- Use the unified window factory with auto-hide config passed through
   M.window_id, M.buffer_id = floating_window.create_typed_window("session_list", {
     width = width,
     height = height,
     row = row,
     col = col,
-    enter = true
+    enter = true,
+    auto_hide = config.auto_hide,
+    auto_hide_callback = config.auto_hide_callback
   })
   
   M.setup_keymaps()
