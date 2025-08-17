@@ -1,5 +1,6 @@
 -- Unified floating window factory with enhanced configuration support
 local buffer_protection = require("luxterm.ui.buffer_protection")
+local utils = require("luxterm.utils")
 
 local M = {}
 
@@ -177,7 +178,7 @@ function M.create_split_layout(base_config, left_config, right_config)
 end
 
 function M.close_window(winid)
-  if winid and vim.api.nvim_win_is_valid(winid) then
+  if utils.is_valid_window(winid) then
     vim.api.nvim_win_close(winid, true)
     return true
   end
@@ -185,7 +186,7 @@ function M.close_window(winid)
 end
 
 function M.focus_window(winid)
-  if winid and vim.api.nvim_win_is_valid(winid) then
+  if utils.is_valid_window(winid) then
     vim.api.nvim_set_current_win(winid)
     return true
   end
@@ -193,12 +194,12 @@ function M.focus_window(winid)
 end
 
 function M.update_window_content(winid, lines)
-  if not winid or not vim.api.nvim_win_is_valid(winid) then
+  if not utils.is_valid_window(winid) then
     return false
   end
   
   local bufnr = vim.api.nvim_win_get_buf(winid)
-  if not vim.api.nvim_buf_is_valid(bufnr) then
+  if not utils.is_valid_buffer(bufnr) then
     return false
   end
   
@@ -207,7 +208,7 @@ function M.update_window_content(winid, lines)
 end
 
 function M.resize_window(winid, width, height)
-  if not winid or not vim.api.nvim_win_is_valid(winid) then
+  if not utils.is_valid_window(winid) then
     return false
   end
   
@@ -219,7 +220,7 @@ function M.resize_window(winid, width, height)
 end
 
 function M.move_window(winid, row, col)
-  if not winid or not vim.api.nvim_win_is_valid(winid) then
+  if not utils.is_valid_window(winid) then
     return false
   end
   
@@ -231,7 +232,7 @@ function M.move_window(winid, row, col)
 end
 
 function M.is_floating_window(winid)
-  if not winid or not vim.api.nvim_win_is_valid(winid) then
+  if not utils.is_valid_window(winid) then
     return false
   end
   
@@ -249,7 +250,7 @@ end
 -- Create a session terminal window using the typed window factory
 -- Auto-hide functionality for floating windows
 function M.setup_auto_hide(winid, bufnr, callback)
-  if not winid or not vim.api.nvim_win_is_valid(winid) then
+  if not utils.is_valid_window(winid) then
     return
   end
   
@@ -264,7 +265,7 @@ function M.setup_auto_hide(winid, bufnr, callback)
   
   local function should_hide()
     -- Check if window is still valid
-    if not vim.api.nvim_win_is_valid(winid) then
+    if not utils.is_valid_window(winid) then
       return false
     end
     

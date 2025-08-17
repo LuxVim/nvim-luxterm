@@ -1,6 +1,8 @@
 -- Optimized session list component with borders and highlighting
 local highlights = require("luxterm.ui.highlights")
 local floating_window = require("luxterm.ui.floating_window")
+local buffer_protection = require("luxterm.ui.buffer_protection")
+local utils = require("luxterm.utils")
 
 local M = {
   window_id = nil,
@@ -47,7 +49,7 @@ function M.create_window(config)
 end
 
 function M.destroy()
-  if M.window_id and vim.api.nvim_win_is_valid(M.window_id) then
+  if utils.is_valid_window(M.window_id) then
     vim.api.nvim_win_close(M.window_id, true)
   end
   M.window_id = nil
@@ -78,17 +80,14 @@ function M.update_sessions(sessions, active_session_id, preserve_selection_posit
 end
 
 function M.render()
-  if not M.window_id or not vim.api.nvim_win_is_valid(M.window_id) then
+  if not utils.is_valid_window(M.window_id) then
     return
   end
   
   local lines, highlights = M.generate_content()
   
-  -- Temporarily enable modifiable to update content
-  vim.api.nvim_buf_set_option(M.buffer_id, "modifiable", true)
-  vim.api.nvim_buf_set_lines(M.buffer_id, 0, -1, false, lines)
-  -- Ensure buffer is locked again after content update
-  vim.api.nvim_buf_set_option(M.buffer_id, "modifiable", false)
+  -- Update protected buffer content using shared utility
+  buffer_protection.update_protected_buffer_content(M.buffer_id, lines)
   
   -- Apply highlights using extmarks with priority for better control
   local ns_id = vim.api.nvim_create_namespace("luxterm_session_list")
@@ -430,7 +429,7 @@ function M.get_session_by_number(session_num)
 end
 
 function M.is_visible()
-  return M.window_id and vim.api.nvim_win_is_valid(M.window_id)
+  return utils.is_valid_window(M.window_id)
 end
 
 -- Event emission for loose coupling

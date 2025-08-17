@@ -1,8 +1,10 @@
 -- Reusable buffer protection utility
+local utils = require("luxterm.utils")
+
 local M = {}
 
 function M.setup_protection(buffer_id)
-  if not buffer_id or not vim.api.nvim_buf_is_valid(buffer_id) then
+  if not utils.is_valid_buffer(buffer_id) then
     return false
   end
   
@@ -41,11 +43,11 @@ function M.setup_protection(buffer_id)
 end
 
 function M.setup_cursor_hiding(window_id, buffer_id)
-  if not window_id or not vim.api.nvim_win_is_valid(window_id) then
+  if not utils.is_valid_window(window_id) then
     return false
   end
   
-  if not buffer_id or not vim.api.nvim_buf_is_valid(buffer_id) then
+  if not utils.is_valid_buffer(buffer_id) then
     return false
   end
   
@@ -67,6 +69,17 @@ function M.setup_cursor_hiding(window_id, buffer_id)
     end
   })
   
+  return true
+end
+
+function M.update_protected_buffer_content(bufnr, lines)
+  if not utils.is_valid_buffer(bufnr) then
+    return false
+  end
+  
+  vim.api.nvim_buf_set_option(bufnr, "modifiable", true)
+  vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines)
+  vim.api.nvim_buf_set_option(bufnr, "modifiable", false)
   return true
 end
 

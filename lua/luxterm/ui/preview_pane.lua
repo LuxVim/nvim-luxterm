@@ -1,6 +1,7 @@
 -- Simplified preview pane component
 local highlights = require("luxterm.ui.highlights")
 local buffer_protection = require("luxterm.ui.buffer_protection")
+local utils = require("luxterm.utils")
 
 local M = {
   window_id = nil,
@@ -17,23 +18,23 @@ function M.create_window(winid, bufnr)
   M.buffer_id = bufnr
   
   -- Apply buffer protection and cursor hiding using shared utilities
-  if M.buffer_id and vim.api.nvim_buf_is_valid(M.buffer_id) then
+  if utils.is_valid_buffer(M.buffer_id) then
     -- Set buffer options that aren't handled by the window factory
     vim.api.nvim_buf_set_option(M.buffer_id, "modifiable", false)
   end
   
-  if M.window_id and vim.api.nvim_win_is_valid(M.window_id) then
+  if utils.is_valid_window(M.window_id) then
     buffer_protection.setup_cursor_hiding(M.window_id, M.buffer_id)
   end
 end
 
 
 function M.update_preview(session)
-  if not M.window_id or not vim.api.nvim_win_is_valid(M.window_id) then
+  if not utils.is_valid_window(M.window_id) then
     return
   end
   
-  if not M.buffer_id or not vim.api.nvim_buf_is_valid(M.buffer_id) then
+  if not utils.is_valid_buffer(M.buffer_id) then
     return
   end
   
@@ -108,10 +109,8 @@ function M.update_preview(session)
     end
   end
   
-  -- Update buffer content
-  vim.api.nvim_buf_set_option(M.buffer_id, "modifiable", true)
-  vim.api.nvim_buf_set_lines(M.buffer_id, 0, -1, false, lines)
-  vim.api.nvim_buf_set_option(M.buffer_id, "modifiable", false)
+  -- Update buffer content using shared utility
+  buffer_protection.update_protected_buffer_content(M.buffer_id, lines)
   
   -- Apply highlights
   local ns_id = vim.api.nvim_create_namespace("luxterm_preview")
@@ -133,7 +132,7 @@ function M.destroy()
 end
 
 function M.is_visible()
-  return M.window_id and vim.api.nvim_win_is_valid(M.window_id)
+  return utils.is_valid_window(M.window_id)
 end
 
 return M
