@@ -260,7 +260,7 @@ function M.open_manager()
     
     local left_config = {
       title = " Sessions ",
-      width_ratio = 0.4,
+      width_ratio = 0.25,
       enter = true,
       buffer_options = {filetype = "luxterm_main"}
     }
@@ -580,9 +580,7 @@ function M.list_sessions()
   local session_lines = {"Active sessions:"}
   for i, session in ipairs(sessions) do
     local status = session:get_status()
-    local active = session_manager.get_active_session()
-    local active_marker = active and session.id == active.id and " (active)" or ""
-    table.insert(session_lines, string.format("  %d. %s [%s]%s", i, session.name, status, active_marker))
+    table.insert(session_lines, string.format("  %d. %s [%s]", i, session.name, status))
   end
   vim.notify(table.concat(session_lines, "\n"), vim.log.levels.INFO)
 end

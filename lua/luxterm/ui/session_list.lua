@@ -79,7 +79,7 @@ function M.create_window(config)
   M.setup_buffer_protection()
   
   -- Calculate window size
-  local width = math.floor(vim.o.columns * 0.4)
+  local width = math.floor(vim.o.columns * 0.25)
   local height = math.floor(vim.o.lines * 0.6)
   local row = math.floor((vim.o.lines - height) / 2)
   local col = math.floor((vim.o.columns - width) / 2)
@@ -214,10 +214,6 @@ function M.add_session_content(lines, highlights, session, index)
   -- Use list position for hotkey (consistent with keymap behavior)
   local hotkey = string.format("[%d]", index)
   
-  -- Add active indicator
-  if is_active then
-    status_text = status_text .. " (active)"
-  end
   
   -- Create bordered box
   local status_display = status_icon .. " " .. status_text
