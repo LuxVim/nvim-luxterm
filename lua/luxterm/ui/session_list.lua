@@ -18,6 +18,10 @@ function M.setup_highlights()
   vim.api.nvim_set_hl(0, "LuxtermMenuKey", {fg = "#db2dee", bold = true})
   vim.api.nvim_set_hl(0, "LuxtermSessionSelected", {fg = "#FFA500", bold = true})  -- Orange for selected borders/text
   vim.api.nvim_set_hl(0, "LuxtermSessionNormal", {fg = "#6B6B6B"})  -- Gray for unselected borders
+  
+  -- Border highlighting - use float window background with contrasting foreground
+  vim.api.nvim_set_hl(0, "LuxtermBorderSelected", {fg = "#FFA500", bold = true})  -- Orange for selected borders
+  vim.api.nvim_set_hl(0, "LuxtermBorderNormal", {fg = "#6B6B6B"})  -- Gray for unselected borders
 end
 
 function M.setup(opts)
@@ -226,7 +230,7 @@ function M.add_session_content(lines, highlights, session, index)
   )
   
   -- Choose border style based on selection
-  local border_hl = is_selected and "LuxtermSessionSelected" or "LuxtermSessionNormal"
+  local border_hl = is_selected and "LuxtermBorderSelected" or "LuxtermBorderNormal"
   
   -- Build bordered content
   local line_num = #lines
@@ -281,6 +285,7 @@ function M.add_session_content(lines, highlights, session, index)
   local side_suffix_bytes = string.len(side_suffix)
   
   for i = 1, 2 do
+    local current_line_idx = line_num + i + 1  -- lines array index for the current line being highlighted
     table.insert(highlights, {
       line = line_num + i,
       col_start = 0,
@@ -289,7 +294,7 @@ function M.add_session_content(lines, highlights, session, index)
     })
     table.insert(highlights, {
       line = line_num + i,
-      col_start = string.len(lines[line_num + i + 1]) - side_suffix_bytes,  -- Just the ending " │"
+      col_start = string.len(lines[current_line_idx]) - side_suffix_bytes,  -- Just the ending " │"
       col_end = -1,
       group = border_hl
     })
