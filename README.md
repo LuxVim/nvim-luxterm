@@ -5,7 +5,7 @@
   nvim-luxterm
 </h1>
 
-A floating-window terminal multiplexer for Neovim that provides tmux-like session management with modern UI design.
+A floating-window terminal session manager for Neovim that provides elegant multi-terminal organization with modern UI design.
 
 ---
 
@@ -13,8 +13,9 @@ A floating-window terminal multiplexer for Neovim that provides tmux-like sessio
 
 - **Terminal Session Management**
   - Create, delete, rename, and switch between multiple terminal sessions
-  - Session persistence and automatic cleanup of invalid sessions
+  - Automatic cleanup of invalid sessions during Neovim session
   - Smart session numbering with lowest-available ID assignment
+  - Quick session switching and organization
 
 - **Modern Floating UI**
   - Beautiful floating window manager with split-pane layout
@@ -23,10 +24,10 @@ A floating-window terminal multiplexer for Neovim that provides tmux-like sessio
   - Customizable window dimensions and border styles
 
 - **Performance Optimized**
-  - Event-driven architecture eliminating 1-second polling
+  - Event-driven architecture for responsive UI updates
   - Batched vim.api operations for 50-70% faster rendering
   - Smart content caching with hash-based change detection
-  - Optimized terminal content extraction with streaming support
+  - Optimized terminal content extraction for preview display
 
 - **Intuitive Keybindings**
   - Global toggle accessible from any mode (normal/terminal)
