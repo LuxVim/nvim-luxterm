@@ -219,6 +219,11 @@ function M.create_session(opts)
     vim.api.nvim_set_current_buf(current_buf)
   end
   
+  -- Ensure swap files are disabled for all luxterm terminal buffers
+  if vim.api.nvim_buf_is_valid(bufnr) then
+    vim.api.nvim_buf_set_option(bufnr, "swapfile", false)
+  end
+  
   local session = create_session({
     name = opts.name,
     bufnr = bufnr
