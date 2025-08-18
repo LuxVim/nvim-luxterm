@@ -21,20 +21,20 @@ M.highlight_groups = {
 
 -- Fallback colors if no colorscheme defines them
 M.fallback_highlights = {
-  LuxtermSessionIcon         = { fg = "#ff9e64" },               -- orange accent
-  LuxtermSessionName         = { fg = "#c0caf5" },               -- main foreground
-  LuxtermSessionNameSelected = { fg = "#7aa2f7", bold = true },  -- bright blue highlight
-  LuxtermSessionKey          = { fg = "#bb9af7", bold = true },  -- purple accent for keys
-  LuxtermSessionSelected     = { fg = "#e0af68", bold = true },  -- gold/yellow for selected
-  LuxtermSessionNormal       = { fg = "#565f89" },               -- muted gray
-  LuxtermBorderSelected      = { fg = "#7aa2f7", bold = true },  -- active border (blue)
-  LuxtermBorderNormal        = { fg = "#414868" },               -- subtle border
-  LuxtermMenuIcon            = { fg = "#2ac3de" },               -- cyan accent
-  LuxtermMenuText            = { fg = "#c0caf5" },               -- normal fg
-  LuxtermMenuKey             = { fg = "#bb9af7", bold = true },  -- purple for shortcuts
-  LuxtermPreviewTitle        = { fg = "#2ac3de", bold = true },  -- cyan title
-  LuxtermPreviewContent      = { fg = "#c0caf5" },               -- normal preview text
-  LuxtermPreviewEmpty        = { fg = "#565f89", italic = true } -- muted/empty
+  LuxtermSessionIcon         = { fg = "Yellow" },                  -- icon accent
+  LuxtermSessionName         = { fg = "White" },                   -- main text
+  LuxtermSessionNameSelected = { fg = "Blue", bold = true },       -- active/selected
+  LuxtermSessionKey          = { fg = "Magenta", bold = true },    -- shortcut keys
+  LuxtermSessionSelected     = { fg = "Yellow", bold = true },     -- selected indicator
+  LuxtermSessionNormal       = { fg = "Grey" },                    -- inactive
+  LuxtermBorderSelected      = { fg = "Blue", bold = true },       -- active border
+  LuxtermBorderNormal        = { fg = "Grey" },                    -- inactive border
+  LuxtermMenuIcon            = { fg = "Cyan" },                    -- menu icons
+  LuxtermMenuText            = { fg = "White" },                   -- menu text
+  LuxtermMenuKey             = { fg = "Magenta", bold = true },    -- menu shortcuts
+  LuxtermPreviewTitle        = { fg = "Cyan", bold = true },       -- preview title
+  LuxtermPreviewContent      = { fg = "White" },                   -- preview text
+  LuxtermPreviewEmpty        = { fg = "Grey", italic = true }      -- empty preview
 }
 
 function M.setup_all()
