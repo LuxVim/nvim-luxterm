@@ -303,24 +303,27 @@ function M.add_shortcuts_content(lines, highlights)
     
     table.insert(lines, full_line)
     
-    -- Icon highlight
+    -- Icon highlight (use byte length for col_end)
+    local icon_bytes = string.len(item.icon)
     table.insert(highlights, {
       line = line_num,
       col_start = 2,
-      col_end = 2 + vim.fn.strdisplaywidth(item.icon),
+      col_end = 2 + icon_bytes,
       group = "LuxtermMenuIcon"
     })
     
-    -- Text highlight
+    -- Text highlight (use byte lengths for accurate positioning)
+    local label_bytes = string.len(item.label)
     table.insert(highlights, {
       line = line_num,
-      col_start = 4 + vim.fn.strdisplaywidth(item.icon),
-      col_end = 4 + vim.fn.strdisplaywidth(item.icon) + vim.fn.strdisplaywidth(item.label),
+      col_start = 4 + icon_bytes,
+      col_end = 4 + icon_bytes + label_bytes,
       group = "LuxtermMenuText"
     })
     
-    -- Key highlight
-    local key_start = vim.fn.strdisplaywidth(full_line) - vim.fn.strdisplaywidth(item.key)
+    -- Key highlight (calculate byte position properly)
+    local key_bytes = string.len(item.key)
+    local key_start = string.len(full_line) - key_bytes
     table.insert(highlights, {
       line = line_num,
       col_start = key_start,

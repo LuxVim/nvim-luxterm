@@ -21,20 +21,20 @@ M.highlight_groups = {
 
 -- Fallback colors if no colorscheme defines them
 M.fallback_highlights = {
-  LuxtermSessionIcon = {fg = "#ff7801"},
-  LuxtermSessionName = {fg = "#ffffff"},
-  LuxtermSessionNameSelected = {fg = "#ffffff", bold = true},
-  LuxtermSessionKey = {fg = "#db2dee", bold = true},
-  LuxtermSessionSelected = {fg = "#FFA500", bold = true},
-  LuxtermSessionNormal = {fg = "#6B6B6B"},
-  LuxtermBorderSelected = {fg = "#FFA500", bold = true},
-  LuxtermBorderNormal = {fg = "#6B6B6B"},
-  LuxtermMenuIcon = {fg = "#4ec9b0"},
-  LuxtermMenuText = {fg = "#d4d4d4"},
-  LuxtermMenuKey = {fg = "#db2dee", bold = true},
-  LuxtermPreviewTitle = {fg = "#4ec9b0", bold = true},
-  LuxtermPreviewContent = {fg = "#d4d4d4"},
-  LuxtermPreviewEmpty = {fg = "#6B6B6B", italic = true}
+  LuxtermSessionIcon         = { fg = "#ff9e64" },               -- orange accent
+  LuxtermSessionName         = { fg = "#c0caf5" },               -- main foreground
+  LuxtermSessionNameSelected = { fg = "#7aa2f7", bold = true },  -- bright blue highlight
+  LuxtermSessionKey          = { fg = "#bb9af7", bold = true },  -- purple accent for keys
+  LuxtermSessionSelected     = { fg = "#e0af68", bold = true },  -- gold/yellow for selected
+  LuxtermSessionNormal       = { fg = "#565f89" },               -- muted gray
+  LuxtermBorderSelected      = { fg = "#7aa2f7", bold = true },  -- active border (blue)
+  LuxtermBorderNormal        = { fg = "#414868" },               -- subtle border
+  LuxtermMenuIcon            = { fg = "#2ac3de" },               -- cyan accent
+  LuxtermMenuText            = { fg = "#c0caf5" },               -- normal fg
+  LuxtermMenuKey             = { fg = "#bb9af7", bold = true },  -- purple for shortcuts
+  LuxtermPreviewTitle        = { fg = "#2ac3de", bold = true },  -- cyan title
+  LuxtermPreviewContent      = { fg = "#c0caf5" },               -- normal preview text
+  LuxtermPreviewEmpty        = { fg = "#565f89", italic = true } -- muted/empty
 }
 
 function M.setup_all()
