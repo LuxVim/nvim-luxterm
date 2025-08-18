@@ -54,6 +54,7 @@ A floating-window terminal session manager for Neovim that provides elegant mult
       manager_width = 0.8,
       manager_height = 0.8,
       preview_enabled = true,
+      auto_hide = true,
       keymaps = {
         toggle_manager = "<C-/>",
         next_session = "<C-]>",
@@ -101,6 +102,9 @@ require("luxterm").setup({
   
   -- Focus new sessions when created via :LuxtermNew
   focus_on_create = false,
+  
+  -- Auto-hide floating windows when cursor leaves
+  auto_hide = true,
   
   -- Keybinding configuration
   keymaps = {
@@ -152,10 +156,6 @@ local session = luxterm.create_session({ name = "work", activate = true })
 luxterm.delete_session(session.id)
 luxterm.switch_session(session.id)
 
--- Session navigation
-luxterm.switch_to_next_session()
-luxterm.switch_to_previous_session()
-
 -- Manager control
 luxterm.toggle_manager()
 local is_open = luxterm.is_manager_open()
@@ -188,6 +188,7 @@ local preview = session:get_content_preview()  -- Returns array of preview lines
 require("luxterm").setup({
   preview_enabled = false,      -- Disable preview pane
   manager_width = 0.6,         -- Smaller window
+  auto_hide = false,           -- Keep windows open
   keymaps = {
     toggle_manager = "<C-t>",   -- Use Ctrl+T instead
   }
@@ -200,6 +201,7 @@ require("luxterm").setup({
   manager_width = 0.9,
   manager_height = 0.9,
   focus_on_create = true,       -- Auto-focus new sessions
+  auto_hide = true,            -- Auto-hide when cursor leaves
   keymaps = {
     toggle_manager = "<leader>t",
     next_session = "<leader>]",
