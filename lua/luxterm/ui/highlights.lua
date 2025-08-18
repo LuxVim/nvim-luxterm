@@ -23,7 +23,7 @@ M.highlight_groups = {
 M.fallback_highlights = {
   LuxtermSessionIcon         = { fg = "Yellow" },                  -- icon accent
   LuxtermSessionName         = { fg = "White" },                   -- main text
-  LuxtermSessionNameSelected = { fg = "Blue", bold = true },       -- active/selected
+  LuxtermSessionNameSelected = { fg = "Cyan", bold = true },       -- active/selected
   LuxtermSessionKey          = { fg = "Magenta", bold = true },    -- shortcut keys
   LuxtermSessionSelected     = { fg = "Yellow", bold = true },     -- selected indicator
   LuxtermSessionNormal       = { fg = "Grey" },                    -- inactive
