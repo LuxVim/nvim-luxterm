@@ -14,24 +14,16 @@ A floating-window terminal session manager for Neovim that provides elegant mult
 - **Terminal Session Management**
   - Create, delete, rename, and switch between multiple terminal sessions
   - Automatic cleanup of invalid sessions during Neovim session
-  - Smart session numbering with lowest-available ID assignment
   - Quick session switching and organization
 
 - **Modern Floating UI**
-  - Beautiful floating window manager with split-pane layout
+  - Floating window manager with split-pane layout
   - Live preview pane showing terminal content with intelligent truncation
   - Session list with intuitive navigation and keyboard shortcuts
   - Customizable window dimensions and border styles
 
-- **Performance Optimized**
-  - Event-driven architecture for responsive UI updates
-  - Batched vim.api operations for 50-70% faster rendering
-  - Smart content caching with hash-based change detection
-  - Optimized terminal content extraction for preview display
-
 - **Intuitive Keybindings**
   - Global toggle accessible from any mode (normal/terminal)
-  - Session navigation with next/previous cycling
   - Quick actions for create, delete, rename operations
   - Vim-style navigation within the session manager
 
@@ -57,8 +49,6 @@ A floating-window terminal session manager for Neovim that provides elegant mult
       auto_hide = true,
       keymaps = {
         toggle_manager = "<C-/>",
-        next_session = "<C-]>",
-        prev_session = "<C-[>",
       }
     })
   end
@@ -109,8 +99,6 @@ require("luxterm").setup({
   -- Keybinding configuration
   keymaps = {
     toggle_manager = "<C-/>",     -- Toggle session manager
-    next_session = "<C-]>",       -- Switch to next session
-    prev_session = "<C-[>",       -- Switch to previous session
     global_session_nav = false,   -- Enable global session navigation
   }
 })
@@ -124,8 +112,6 @@ require("luxterm").setup({
 |---------|-------------|---------|
 | `:LuxtermToggle` | Toggle the session manager UI | `:LuxtermToggle` |
 | `:LuxtermNew [name]` | Create new terminal session | `:LuxtermNew` or `:LuxtermNew work` |
-| `:LuxtermNext` | Switch to next session | `:LuxtermNext` |
-| `:LuxtermPrev` | Switch to previous session | `:LuxtermPrev` |
 | `:LuxtermKill [pattern]` | Delete session(s) by pattern | `:LuxtermKill` or `:LuxtermKill work` |
 | `:LuxtermList` | List all active sessions | `:LuxtermList` |
 | `:LuxtermStats` | Show performance statistics | `:LuxtermStats` |
@@ -191,22 +177,6 @@ require("luxterm").setup({
   auto_hide = false,           -- Keep windows open
   keymaps = {
     toggle_manager = "<C-t>",   -- Use Ctrl+T instead
-  }
-})
-```
-
-### Power User Setup
-```lua
-require("luxterm").setup({
-  manager_width = 0.9,
-  manager_height = 0.9,
-  focus_on_create = true,       -- Auto-focus new sessions
-  auto_hide = true,            -- Auto-hide when cursor leaves
-  keymaps = {
-    toggle_manager = "<leader>t",
-    next_session = "<leader>]",
-    prev_session = "<leader>[",
-    global_session_nav = true,  -- Enable global navigation
   }
 })
 ```
