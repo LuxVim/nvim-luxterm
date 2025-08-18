@@ -1,8 +1,26 @@
 -- Consolidated highlight definitions for all UI components
 local M = {}
 
--- Session list highlights
-M.session_highlights = {
+-- Define highlight group names only - let colorscheme handle the colors
+M.highlight_groups = {
+  "LuxtermSessionIcon",
+  "LuxtermSessionName", 
+  "LuxtermSessionNameSelected",
+  "LuxtermSessionKey",
+  "LuxtermSessionSelected",
+  "LuxtermSessionNormal",
+  "LuxtermBorderSelected",
+  "LuxtermBorderNormal",
+  "LuxtermMenuIcon",
+  "LuxtermMenuText",
+  "LuxtermMenuKey", 
+  "LuxtermPreviewTitle",
+  "LuxtermPreviewContent",
+  "LuxtermPreviewEmpty"
+}
+
+-- Fallback colors if no colorscheme defines them
+M.fallback_highlights = {
   LuxtermSessionIcon = {fg = "#ff7801"},
   LuxtermSessionName = {fg = "#ffffff"},
   LuxtermSessionNameSelected = {fg = "#ffffff", bold = true},
@@ -10,51 +28,53 @@ M.session_highlights = {
   LuxtermSessionSelected = {fg = "#FFA500", bold = true},
   LuxtermSessionNormal = {fg = "#6B6B6B"},
   LuxtermBorderSelected = {fg = "#FFA500", bold = true},
-  LuxtermBorderNormal = {fg = "#6B6B6B"}
-}
-
--- Menu highlights
-M.menu_highlights = {
+  LuxtermBorderNormal = {fg = "#6B6B6B"},
   LuxtermMenuIcon = {fg = "#4ec9b0"},
   LuxtermMenuText = {fg = "#d4d4d4"},
-  LuxtermMenuKey = {fg = "#db2dee", bold = true}
-}
-
--- Preview pane highlights
-M.preview_highlights = {
+  LuxtermMenuKey = {fg = "#db2dee", bold = true},
   LuxtermPreviewTitle = {fg = "#4ec9b0", bold = true},
   LuxtermPreviewContent = {fg = "#d4d4d4"},
   LuxtermPreviewEmpty = {fg = "#6B6B6B", italic = true}
 }
 
 function M.setup_all()
-  -- Set all highlight groups
-  for name, opts in pairs(M.session_highlights) do
-    vim.api.nvim_set_hl(0, name, opts)
-  end
-  
-  for name, opts in pairs(M.menu_highlights) do
-    vim.api.nvim_set_hl(0, name, opts)
-  end
-  
-  for name, opts in pairs(M.preview_highlights) do
-    vim.api.nvim_set_hl(0, name, opts)
+  -- Only set fallback colors if colorscheme hasn't defined them
+  for _, group_name in ipairs(M.highlight_groups) do
+    local existing = vim.api.nvim_get_hl(0, { name = group_name })
+    if vim.tbl_isempty(existing) and M.fallback_highlights[group_name] then
+      vim.api.nvim_set_hl(0, group_name, M.fallback_highlights[group_name])
+    end
   end
 end
 
 function M.setup_session_highlights()
-  for name, opts in pairs(M.session_highlights) do
-    vim.api.nvim_set_hl(0, name, opts)
-  end
+  -- Only setup fallbacks for session-related groups
+  local session_groups = {
+    "LuxtermSessionIcon", "LuxtermSessionName", "LuxtermSessionNameSelected",
+    "LuxtermSessionKey", "LuxtermSessionSelected", "LuxtermSessionNormal", 
+    "LuxtermBorderSelected", "LuxtermBorderNormal", "LuxtermMenuIcon",
+    "LuxtermMenuText", "LuxtermMenuKey"
+  }
   
-  for name, opts in pairs(M.menu_highlights) do
-    vim.api.nvim_set_hl(0, name, opts)
+  for _, group_name in ipairs(session_groups) do
+    local existing = vim.api.nvim_get_hl(0, { name = group_name })
+    if vim.tbl_isempty(existing) and M.fallback_highlights[group_name] then
+      vim.api.nvim_set_hl(0, group_name, M.fallback_highlights[group_name])
+    end
   end
 end
 
 function M.setup_preview_highlights()
-  for name, opts in pairs(M.preview_highlights) do
-    vim.api.nvim_set_hl(0, name, opts)
+  -- Only setup fallbacks for preview-related groups
+  local preview_groups = {
+    "LuxtermPreviewTitle", "LuxtermPreviewContent", "LuxtermPreviewEmpty"
+  }
+  
+  for _, group_name in ipairs(preview_groups) do
+    local existing = vim.api.nvim_get_hl(0, { name = group_name })
+    if vim.tbl_isempty(existing) and M.fallback_highlights[group_name] then
+      vim.api.nvim_set_hl(0, group_name, M.fallback_highlights[group_name])
+    end
   end
 end
 
