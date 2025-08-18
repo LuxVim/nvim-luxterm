@@ -347,11 +347,9 @@ function M.create_session_window(session, config)
     on_create = function(winid, bufnr)
       -- Setup terminal-specific keymaps
       local opts = {noremap = true, silent = true, buffer = bufnr}
-      vim.keymap.set("t", "<Esc>", "<C-\\><C-n>", opts)
+      -- Don't map ESC at all - let it work normally for nested editors like git commit
+      -- Use C-Esc to close terminal window from terminal mode
       vim.keymap.set("t", "<C-Esc>", function()
-        M.close_window(winid)
-      end, opts)
-      vim.keymap.set("n", "<Esc>", function()
         M.close_window(winid)
       end, opts)
       
