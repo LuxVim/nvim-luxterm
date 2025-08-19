@@ -110,7 +110,6 @@ local function find_lowest_session_number()
     end
   end
   
-  -- Find lowest unused number starting from 1
   local lowest = 1
   while used_numbers[lowest] do
     lowest = lowest + 1

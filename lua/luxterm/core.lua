@@ -552,8 +552,6 @@ function M.open_session_window(session)
   end
   
   floating_window.create_session_window(session, {
-    width = total_width,
-    height = total_height,
     auto_hide = M.config.auto_hide
   })
   
