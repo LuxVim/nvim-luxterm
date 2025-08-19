@@ -1,0 +1,58 @@
+# Neovim plugin specific
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.iml
+
+# Temporary files
+*.tmp
+*.temp
+
+# Log files
+*.log
+
+# Backup files
+*.bak
+*.backup
+
+# Node modules (if any build tools are used)
+node_modules/
+
+# Lua bytecode
+*.luac
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Documentation build artifacts
+doc/tags
+
+# Plugin manager directories (if testing locally)
+pack/
+plugin/
+
+# Local development files
+.local/
+.cache/
+
+# Runtime generated files
+.session
+*.session
+
+# Claude Code files
+.claude/
+CLAUDE.md
