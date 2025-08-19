@@ -326,18 +326,42 @@ function M.open_manager()
 end
 
 function M.setup_manager_close_handler()
-  local winid_to_watch = M.manager_layout.type == "split" 
-    and M.manager_layout.windows.left.winid 
-    or M.manager_layout.window_id
-  
-  if winid_to_watch then
-    vim.api.nvim_create_autocmd("WinClosed", {
-      pattern = tostring(winid_to_watch),
-      callback = function()
-        M.close_manager()
-      end,
-      once = true
-    })
+  if M.manager_layout.type == "split" then
+    -- Watch both left and right windows for closure
+    local left_winid = M.manager_layout.windows.left.winid
+    local right_winid = M.manager_layout.windows.right.winid
+    
+    if left_winid then
+      vim.api.nvim_create_autocmd("WinClosed", {
+        pattern = tostring(left_winid),
+        callback = function()
+          M.close_manager()
+        end,
+        once = true
+      })
+    end
+    
+    if right_winid then
+      vim.api.nvim_create_autocmd("WinClosed", {
+        pattern = tostring(right_winid),
+        callback = function()
+          M.close_manager()
+        end,
+        once = true
+      })
+    end
+  else
+    -- Single window layout
+    local winid_to_watch = M.manager_layout.window_id
+    if winid_to_watch then
+      vim.api.nvim_create_autocmd("WinClosed", {
+        pattern = tostring(winid_to_watch),
+        callback = function()
+          M.close_manager()
+        end,
+        once = true
+      })
+    end
   end
 end
 
