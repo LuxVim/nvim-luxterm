@@ -47,6 +47,7 @@ function M.setup(user_config)
   session_list.setup()
   preview_pane.setup()
   
+  
   M.setup_event_handlers()
   M.setup_autocmds()
   M.setup_user_commands()

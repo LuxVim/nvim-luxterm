@@ -122,7 +122,9 @@ function M.generate_content()
     end
   end
   
-  M.add_shortcuts_content(lines, highlights)
+  table.insert(lines, "")
+  table.insert(lines, "")
+   M.add_shortcuts_content(lines, highlights)
   
   return lines, highlights
 end
@@ -230,7 +232,7 @@ function M.add_session_content(lines, highlights, session, index)
   })
   
   -- Highlight status icon (orange when selected, default otherwise)
-  local icon_hl_group = is_selected and "LuxtermSessionSelected" or "LuxtermSessionIcon"
+  local icon_hl_group = is_selected and "LuxtermSessionIconSelected" or "LuxtermSessionIcon"
   local status_icon_bytes = string.len(status_icon)
   table.insert(highlights, {
     line = line_num + 1,
