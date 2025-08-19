@@ -26,10 +26,10 @@ function M.create_window(config)
   end
   
   -- Calculate window size
-  local width = config.width or math.floor(vim.o.columns * 0.25)
-  local height = config.height or math.floor(vim.o.lines * 0.6)
-  local row = config.row or math.floor((vim.o.lines - height) / 2)
-  local col = config.col or math.floor((vim.o.columns - width) / 2)
+  local width = config.width or utils.calculate_size_from_ratio(0.25, 0.6)
+  local height = config.height or select(2, utils.calculate_size_from_ratio(0.25, 0.6))
+  local row = config.row or utils.calculate_centered_position(width, height)
+  local col = config.col or select(2, utils.calculate_centered_position(width, height))
   
   -- Use the unified window factory with auto-hide config passed through
   M.window_id, M.buffer_id = floating_window.create_typed_window("session_list", {

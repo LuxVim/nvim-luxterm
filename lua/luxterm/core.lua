@@ -5,6 +5,7 @@ local preview_pane = require("luxterm.ui.preview_pane")
 local floating_window = require("luxterm.ui.floating_window")
 local events = require("luxterm.events")
 local highlights = require("luxterm.ui.highlights")
+local utils = require("luxterm.utils")
 
 local M = {
   initialized = false,
@@ -248,9 +249,8 @@ function M.open_manager()
     return true
   end
   
-  local total_width = math.floor(vim.o.columns * M.config.manager_width)
-  local total_height = math.floor(vim.o.lines * M.config.manager_height)
-  local row, col = floating_window.calculate_centered_position(total_width, total_height)
+  local total_width, total_height = utils.calculate_size_from_ratio(M.config.manager_width, M.config.manager_height)
+  local row, col = utils.calculate_centered_position(total_width, total_height)
   
   if M.config.preview_enabled then
     -- Create split layout
@@ -552,8 +552,8 @@ function M.open_session_window(session)
   end
   
   floating_window.create_session_window(session, {
-    width = math.floor(vim.o.columns * M.config.manager_width),
-    height = math.floor(vim.o.lines * M.config.manager_height),
+    width = total_width,
+    height = total_height,
     auto_hide = M.config.auto_hide
   })
   

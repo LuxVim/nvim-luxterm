@@ -12,13 +12,7 @@ M.window_types = {
     title = " Sessions ",
     title_pos = "center",
     style = "minimal",
-    buffer_options = {
-      filetype = "luxterm_main",
-      bufhidden = "wipe",
-      swapfile = false,
-      buftype = "nofile",
-      modifiable = false
-    },
+    buffer_options = utils.buffer_presets.luxterm_main,
     protected = true,
     hide_cursor = true
   },
@@ -29,13 +23,7 @@ M.window_types = {
     title = " Preview ",
     title_pos = "center",
     style = "minimal",
-    buffer_options = {
-      filetype = "luxterm_preview",
-      bufhidden = "wipe",
-      swapfile = false,
-      buftype = "nofile",
-      modifiable = false
-    },
+    buffer_options = utils.buffer_presets.luxterm_preview,
     hide_cursor = true
   },
   
@@ -58,25 +46,30 @@ function M.create_window(config)
   if not bufnr then
     bufnr = vim.api.nvim_create_buf(false, true)
     if config.buffer_options then
-      for opt, value in pairs(config.buffer_options) do
-        vim.api.nvim_buf_set_option(bufnr, opt, value)
-      end
+      utils.apply_buffer_options(bufnr, config.buffer_options)
     end
+  end
+  
+  -- Set default dimensions if not provided
+  local width, height = config.width, config.height
+  if not width or not height then
+    local default_width, default_height = utils.calculate_size_from_ratio(0.8, 0.8)
+    width = width or default_width
+    height = height or default_height
   end
   
   -- Default window config
   local win_config = {
     relative = config.relative or "editor",
-    width = config.width or math.floor(vim.o.columns * 0.8),
-    height = config.height or math.floor(vim.o.lines * 0.8),
+    width = width,
+    height = height,
     border = config.border or "rounded",
     style = "minimal"
   }
   
   -- Calculate position if not provided
   if not config.row or not config.col then
-    win_config.row = math.floor((vim.o.lines - win_config.height) / 2)
-    win_config.col = math.floor((vim.o.columns - win_config.width) / 2)
+    win_config.row, win_config.col = utils.calculate_centered_position(win_config.width, win_config.height)
   else
     win_config.row = config.row
     win_config.col = config.col
@@ -240,12 +233,6 @@ function M.is_floating_window(winid)
   return config.relative and config.relative ~= ""
 end
 
--- Utility function to calculate centered position
-function M.calculate_centered_position(width, height)
-  local row = math.floor((vim.o.lines - height) / 2)
-  local col = math.floor((vim.o.columns - width) / 2)
-  return row, col
-end
 
 -- Create a session terminal window using the typed window factory
 -- Auto-hide functionality for floating windows
@@ -322,9 +309,13 @@ end
 function M.create_session_window(session, config)
   config = config or {}
   
-  local width = config.width or math.floor(vim.o.columns * 0.8)
-  local height = config.height or math.floor(vim.o.lines * 0.8)
-  local row, col = M.calculate_centered_position(width, height)
+  local width, height = config.width, config.height
+  if not width or not height then
+    local default_width, default_height = utils.calculate_size_from_ratio(0.8, 0.8)
+    width = width or default_width
+    height = height or default_height
+  end
+  local row, col = utils.calculate_centered_position(width, height)
   
   -- Get auto_hide setting from config, defaulting to true for backwards compatibility
   local auto_hide = config.auto_hide

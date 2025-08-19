@@ -1,4 +1,6 @@
 -- Consolidated session management - combines entity, manager, and repository
+local utils = require("luxterm.utils")
+
 local M = {
   sessions = {},
   active_session_id = nil,
@@ -220,9 +222,7 @@ function M.create_session(opts)
   end
   
   -- Ensure swap files are disabled for all luxterm terminal buffers
-  if vim.api.nvim_buf_is_valid(bufnr) then
-    vim.api.nvim_buf_set_option(bufnr, "swapfile", false)
-  end
+  utils.apply_buffer_options(bufnr, "terminal")
   
   local session = create_session({
     name = opts.name,
