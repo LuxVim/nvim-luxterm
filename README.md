@@ -101,8 +101,8 @@ require("luxterm").setup({
   -- Keybinding configuration
   keymaps = {
     toggle_manager = "<C-/>",     -- Toggle session manager
-    next_session = "<C-]>",       -- Next session keybinding
-    prev_session = "<C-[>",       -- Previous session keybinding
+    next_session = "<C-k>",       -- Next session keybinding
+    prev_session = "<C-j>",       -- Previous session keybinding
     global_session_nav = false,   -- Enable global session navigation
   }
 })
@@ -149,8 +149,7 @@ luxterm.delete_session(session.id)
 luxterm.switch_session(session.id)
 
 -- Session navigation
-luxterm.switch_to_next_session()    -- Cycle to next session
-luxterm.switch_to_previous_session()  -- Cycle to previous session
+-- Use :LuxtermNext and :LuxtermPrev commands
 
 -- Manager control
 luxterm.toggle_manager()
@@ -197,8 +196,8 @@ nvim-luxterm provides powerful session navigation features that work in both nor
 ```lua
 require("luxterm").setup({
   keymaps = {
-    next_session = "<C-]>",         -- Next session
-    prev_session = "<C-[>",         -- Previous session
+    next_session = "<C-k>",         -- Next session
+    prev_session = "<C-j>",         -- Previous session
     global_session_nav = true,      -- Enable global navigation (works everywhere)
   }
 })
