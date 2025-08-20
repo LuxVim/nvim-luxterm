@@ -28,8 +28,8 @@ local default_config = {
   auto_hide = true,  -- Auto-hide floating windows when cursor leaves
   keymaps = {
     toggle_manager = "<C-/>",
-    next_session = "<C-]>",
-    prev_session = "<C-[>",
+    next_session = "<C-k>",   -- Vi-style: k for up/next
+    prev_session = "<C-j>",   -- Vi-style: j for down/previous
     global_session_nav = false
   }
 }
@@ -107,6 +107,7 @@ function M.setup_autocmds()
     group = vim.api.nvim_create_augroup("LuxtermTermOpen", {clear = true}),
     callback = function(args)
       M.handle_terminal_opened(args.buf)
+      -- Only set up keymaps for confirmed luxterm sessions (strict filtering applied in function)
       M.setup_terminal_keymaps(args.buf)
     end
   })
@@ -236,24 +237,44 @@ function M.setup_terminal_keymaps(bufnr)
     end
   end
   
+  -- STRICT filtering: Only set up keymaps for terminals that are definitely luxterm sessions
+  -- Do NOT set up keymaps based on buffer name matching - this is too broad and interferes with other terminals
   if not is_luxterm_terminal then
-    -- Check if this terminal has "luxterm" in its name  
-    local buf_name = vim.api.nvim_buf_get_name(bufnr)
-    if not string.match(buf_name, "luxterm") then
-      return
-    end
+    return
   end
   
   local opts = {noremap = true, silent = true, buffer = bufnr}
   
   -- Set up session navigation keybindings for terminal mode
-  vim.keymap.set("t", M.config.keymaps.next_session, function()
-    M.switch_to_next_session()
-  end, vim.tbl_extend("force", opts, {desc = "Next terminal session"}))
+  local next_key = M.config.keymaps.next_session
+  local prev_key = M.config.keymaps.prev_session
   
-  vim.keymap.set("t", M.config.keymaps.prev_session, function()
-    M.switch_to_previous_session()
-  end, vim.tbl_extend("force", opts, {desc = "Previous terminal session"}))
+  -- Blacklist of keys that should never be mapped in terminal mode
+  local blacklisted_keys = {
+    "<Esc>", "<ESC>", "<C-[>", 
+    -- Add other potentially problematic keys
+  }
+  
+  local function is_blacklisted(key)
+    for _, blacklisted in ipairs(blacklisted_keys) do
+      if key == blacklisted then
+        return true
+      end
+    end
+    return false
+  end
+  
+  if next_key and not is_blacklisted(next_key) then
+    vim.keymap.set("t", next_key, function()
+      M.switch_to_next_session()
+    end, vim.tbl_extend("force", opts, {desc = "Next terminal session"}))
+  end
+  
+  if prev_key and not is_blacklisted(prev_key) then
+    vim.keymap.set("t", prev_key, function()
+      M.switch_to_previous_session()
+    end, vim.tbl_extend("force", opts, {desc = "Previous terminal session"}))
+  end
 end
 
 function M.setup_existing_terminal_keymaps()
