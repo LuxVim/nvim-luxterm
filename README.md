@@ -15,6 +15,7 @@ A floating-window terminal session manager for Neovim, offering elegant multi-te
   - Create, delete, rename, and switch between multiple terminal sessions
   - Automatic cleanup of invalid sessions during Neovim session
   - Quick session switching and organization
+  - Session navigation with next/previous cycling functionality
 
 - **Modern Floating UI**
   - Floating window manager with split-pane layout
@@ -26,6 +27,7 @@ A floating-window terminal session manager for Neovim, offering elegant multi-te
   - Global toggle accessible from any mode (normal/terminal)
   - Quick actions for create, delete, rename operations
   - Vim-style navigation within the session manager
+  - Direct session navigation with customizable keybindings
 
 - **Compatibility**
   - Neovim 0.8.0+ required
@@ -99,6 +101,8 @@ require("luxterm").setup({
   -- Keybinding configuration
   keymaps = {
     toggle_manager = "<C-/>",     -- Toggle session manager
+    next_session = "<C-]>",       -- Next session keybinding
+    prev_session = "<C-[>",       -- Previous session keybinding
     global_session_nav = false,   -- Enable global session navigation
   }
 })
@@ -112,6 +116,8 @@ require("luxterm").setup({
 |---------|-------------|---------|
 | `:LuxtermToggle` | Toggle the session manager UI | `:LuxtermToggle` |
 | `:LuxtermNew [name]` | Create new terminal session | `:LuxtermNew` or `:LuxtermNew work` |
+| `:LuxtermNext` | Switch to next terminal session | `:LuxtermNext` |
+| `:LuxtermPrev` | Switch to previous terminal session | `:LuxtermPrev` |
 | `:LuxtermKill [pattern]` | Delete session(s) by pattern | `:LuxtermKill` or `:LuxtermKill work` |
 | `:LuxtermList` | List all active sessions | `:LuxtermList` |
 | `:LuxtermStats` | Show performance statistics | `:LuxtermStats` |
@@ -141,6 +147,10 @@ local luxterm = require("luxterm")
 local session = luxterm.create_session({ name = "work", activate = true })
 luxterm.delete_session(session.id)
 luxterm.switch_session(session.id)
+
+-- Session navigation
+luxterm.switch_to_next_session()    -- Cycle to next session
+luxterm.switch_to_previous_session()  -- Cycle to previous session
 
 -- Manager control
 luxterm.toggle_manager()
@@ -181,12 +191,29 @@ require("luxterm").setup({
 })
 ```
 
+### Session Navigation
+nvim-luxterm provides powerful session navigation features that work in both normal and terminal modes:
+
+```lua
+require("luxterm").setup({
+  keymaps = {
+    next_session = "<C-]>",         -- Next session
+    prev_session = "<C-[>",         -- Previous session
+    global_session_nav = true,      -- Enable global navigation (works everywhere)
+  }
+})
+```
+
+When `global_session_nav` is enabled, you can cycle through terminal sessions from anywhere in Neovim. The navigation automatically opens the selected session in a floating window and closes any previously opened session windows.
+
 ### Custom Keybindings
 ```lua
 -- Additional custom keybindings after setup
 vim.keymap.set("n", "<leader>tn", ":LuxtermNew<CR>", { desc = "New terminal" })
 vim.keymap.set("n", "<leader>tl", ":LuxtermList<CR>", { desc = "List terminals" })
 vim.keymap.set("n", "<leader>tk", ":LuxtermKill<CR>", { desc = "Kill terminal" })
+vim.keymap.set("n", "<leader>tj", ":LuxtermNext<CR>", { desc = "Next terminal session" })
+vim.keymap.set("n", "<leader>th", ":LuxtermPrev<CR>", { desc = "Previous terminal session" })
 ```
 
 ---

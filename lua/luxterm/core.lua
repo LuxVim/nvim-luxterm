@@ -28,8 +28,8 @@ local default_config = {
   auto_hide = true,  -- Auto-hide floating windows when cursor leaves
   keymaps = {
     toggle_manager = "<C-/>",
-    next_session = "<C-]>",
-    prev_session = "<C-[>",
+    next_session = "<C-k>",   -- Vi-style: k for up/next
+    prev_session = "<C-j>",   -- Vi-style: j for down/previous
     global_session_nav = false
   }
 }
@@ -53,6 +53,7 @@ function M.setup(user_config)
   M.setup_autocmds()
   M.setup_user_commands()
   M.setup_global_keymaps()
+  M.setup_existing_terminal_keymaps()
   
   M.initialized = true
   
@@ -106,6 +107,8 @@ function M.setup_autocmds()
     group = vim.api.nvim_create_augroup("LuxtermTermOpen", {clear = true}),
     callback = function(args)
       M.handle_terminal_opened(args.buf)
+      -- Only set up keymaps for confirmed luxterm sessions (strict filtering applied in function)
+      M.setup_terminal_keymaps(args.buf)
     end
   })
   
@@ -222,22 +225,91 @@ function M.setup_global_keymaps()
   end
 end
 
+function M.setup_terminal_keymaps(bufnr)
+  -- Only set up keymaps for luxterm-managed terminals
+  local sessions = session_manager.get_all_sessions()
+  local is_luxterm_terminal = false
+  
+  for _, session in ipairs(sessions) do
+    if session.bufnr == bufnr then
+      is_luxterm_terminal = true
+      break
+    end
+  end
+  
+  -- STRICT filtering: Only set up keymaps for terminals that are definitely luxterm sessions
+  -- Do NOT set up keymaps based on buffer name matching - this is too broad and interferes with other terminals
+  if not is_luxterm_terminal then
+    return
+  end
+  
+  local opts = {noremap = true, silent = true, buffer = bufnr}
+  
+  -- Set up session navigation keybindings for terminal mode
+  local next_key = M.config.keymaps.next_session
+  local prev_key = M.config.keymaps.prev_session
+  
+  -- Blacklist of keys that should never be mapped in terminal mode
+  local blacklisted_keys = {
+    "<Esc>", "<ESC>", "<C-[>", 
+    -- Add other potentially problematic keys
+  }
+  
+  local function is_blacklisted(key)
+    for _, blacklisted in ipairs(blacklisted_keys) do
+      if key == blacklisted then
+        return true
+      end
+    end
+    return false
+  end
+  
+  if next_key and not is_blacklisted(next_key) then
+    vim.keymap.set("t", next_key, function()
+      M.switch_to_next_session()
+    end, vim.tbl_extend("force", opts, {desc = "Next terminal session"}))
+  end
+  
+  if prev_key and not is_blacklisted(prev_key) then
+    vim.keymap.set("t", prev_key, function()
+      M.switch_to_previous_session()
+    end, vim.tbl_extend("force", opts, {desc = "Previous terminal session"}))
+  end
+end
+
+function M.setup_existing_terminal_keymaps()
+  -- Set up keymaps for any existing terminal sessions
+  local sessions = session_manager.get_all_sessions()
+  for _, session in ipairs(sessions) do
+    if session:is_valid() then
+      M.setup_terminal_keymaps(session.bufnr)
+    end
+  end
+end
+
 -- Core functionality
 function M.toggle_manager()
   M.stats.manager_toggles = M.stats.manager_toggles + 1
   
-  -- Check if we're currently in a session window and close it first
+  -- Check if we're currently in a session window 
   local current_win = vim.api.nvim_get_current_win()
+  local is_in_session_window = false
+  
   if floating_window.is_floating_window(current_win) then
-    -- If we're in a floating window (likely a session terminal), close it
     local current_buf = vim.api.nvim_win_get_buf(current_win)
     local filetype = vim.api.nvim_buf_get_option(current_buf, "filetype")
     if filetype == "terminal" or vim.api.nvim_buf_get_option(current_buf, "buftype") == "terminal" then
-      floating_window.close_window(current_win)
+      is_in_session_window = true
+      -- Close ALL session terminal windows, not just the current one
+      M.close_all_session_windows()
     end
   end
   
-  if M.is_manager_open() then
+  -- If we were in a session window, always open the manager
+  -- Otherwise, toggle based on current manager state
+  if is_in_session_window then
+    M.open_manager()
+  elseif M.is_manager_open() then
     M.close_manager()
   else
     M.open_manager()
@@ -505,6 +577,9 @@ function M.switch_session(session_id)
 end
 
 function M.switch_to_next_session()
+  -- Close all existing session windows before opening the new one
+  M.close_all_session_windows()
+  
   local session = session_manager.switch_to_next()
   if session then
     events.emit(events.SESSION_SWITCHED, {session = session})
@@ -517,6 +592,9 @@ function M.switch_to_next_session()
 end
 
 function M.switch_to_previous_session()
+  -- Close all existing session windows before opening the new one
+  M.close_all_session_windows()
+  
   local session = session_manager.switch_to_previous()
   if session then
     events.emit(events.SESSION_SWITCHED, {session = session})
@@ -531,6 +609,8 @@ end
 function M.open_selected_session()
   local session = session_list.get_selected_session()
   if session then
+    -- Close all existing session windows before opening the selected one
+    M.close_all_session_windows()
     M.switch_session(session.id)
     M.open_session_window(session)
     M.close_manager()
@@ -540,6 +620,8 @@ end
 function M.select_session_by_index(index)
   local session = session_list.get_session_at_index(index)
   if session then
+    -- Close all existing session windows before opening the selected one
+    M.close_all_session_windows()
     M.switch_session(session.id)
     M.open_session_window(session)
     M.close_manager()
@@ -554,6 +636,9 @@ function M.open_session_window(session)
   floating_window.create_session_window(session, {
     auto_hide = M.config.auto_hide
   })
+  
+  -- Ensure terminal keymaps are set up for this session
+  M.setup_terminal_keymaps(session.bufnr)
   
   return true
 end
@@ -583,6 +668,32 @@ function M.rename_selected_session()
   end)
   
   return true
+end
+
+function M.close_all_session_windows()
+  -- Close all floating windows that contain session terminal buffers
+  local sessions = session_manager.get_all_sessions()
+  local closed_count = 0
+  
+  for _, win in ipairs(vim.api.nvim_list_wins()) do
+    if vim.api.nvim_win_is_valid(win) and floating_window.is_floating_window(win) then
+      local buf = vim.api.nvim_win_get_buf(win)
+      local filetype = vim.api.nvim_buf_get_option(buf, "filetype")
+      
+      -- Check if this is a terminal window with a session buffer
+      if filetype == "terminal" or vim.api.nvim_buf_get_option(buf, "buftype") == "terminal" then
+        for _, session in ipairs(sessions) do
+          if session.bufnr == buf then
+            floating_window.close_window(win)
+            closed_count = closed_count + 1
+            break
+          end
+        end
+      end
+    end
+  end
+  
+  return closed_count
 end
 
 function M.update_session_window_title(session)

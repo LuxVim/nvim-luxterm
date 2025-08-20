@@ -338,7 +338,8 @@ function M.create_session_window(session, config)
     on_create = function(winid, bufnr)
       -- Setup terminal-specific keymaps
       local opts = {noremap = true, silent = true, buffer = bufnr}
-      -- Don't map ESC at all - let it work normally for nested editors like git commit
+      
+      -- Don't map ESC at all - let it pass through to the terminal application
       -- Use C-Esc to close terminal window from terminal mode
       vim.keymap.set("t", "<C-Esc>", function()
         M.close_window(winid)
@@ -349,9 +350,17 @@ function M.create_session_window(session, config)
       if core and core.config then
         local toggle_key = core.config.keymaps.toggle_manager
         if toggle_key then
-          vim.keymap.set({"n", "t"}, toggle_key, function()
-            core.toggle_manager()
-          end, vim.tbl_extend("force", opts, {desc = "Toggle Luxterm manager"}))
+          -- Be very careful about terminal mode keymaps - only set if not ESC
+          if toggle_key ~= "<Esc>" and toggle_key ~= "<ESC>" then
+            vim.keymap.set({"n", "t"}, toggle_key, function()
+              core.toggle_manager()
+            end, vim.tbl_extend("force", opts, {desc = "Toggle Luxterm manager"}))
+          else
+            -- Only set in normal mode if toggle key is ESC
+            vim.keymap.set("n", toggle_key, function()
+              core.toggle_manager()
+            end, vim.tbl_extend("force", opts, {desc = "Toggle Luxterm manager"}))
+          end
         end
       end
       

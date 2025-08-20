@@ -311,10 +311,30 @@ function M.get_session_count()
   return vim.tbl_count(M.sessions)
 end
 
-function M.switch_to_next()
+-- Helper function to handle session switching edge cases
+local function check_switch_conditions()
   local sessions = M.get_all_sessions()
-  if #sessions <= 1 then
-    return nil
+  
+  -- No sessions available
+  if #sessions == 0 then
+    return nil, nil
+  end
+  
+  -- Single session - just activate and return it (prevents window hiding)
+  if #sessions == 1 then
+    local session = sessions[1]
+    session:activate()
+    return session, nil
+  end
+  
+  -- Multiple sessions - return sessions and proceed with normal switching logic
+  return nil, sessions
+end
+
+function M.switch_to_next()
+  local early_return, sessions = check_switch_conditions()
+  if early_return then
+    return early_return
   end
   
   local current_idx = 1
@@ -334,9 +354,9 @@ function M.switch_to_next()
 end
 
 function M.switch_to_previous()
-  local sessions = M.get_all_sessions()
-  if #sessions <= 1 then
-    return nil
+  local early_return, sessions = check_switch_conditions()
+  if early_return then
+    return early_return
   end
   
   local current_idx = 1
