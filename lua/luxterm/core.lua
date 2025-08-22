@@ -99,10 +99,6 @@ local function process_session_windows(operations)
   return results
 end
 
--- Remove default_config - now handled by config module
-
--- Configuration management is now handled by config module
-
 -- Initialize all plugin components with error handling
 local function initialize_components()
   local components = {
