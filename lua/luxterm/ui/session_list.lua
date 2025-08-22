@@ -18,7 +18,9 @@ local M = {
   keymap_handlers = {},
   namespace_id = nil,
   last_cursor_pos = nil,
-  pending_buffer_update = false
+  pending_buffer_update = false,
+  max_cache_entries = 10,
+  cache_cleanup_threshold = 20
 }
 
 
@@ -110,14 +112,31 @@ function M.cleanup_keymaps()
   end
 end
 
+function M.cleanup_all_caches()
+  -- Clear all cached data to free memory
+  M.cached_content = nil
+  M.cached_highlights = nil
+  M.content_cache_key = nil
+  M.cached_width = nil
+  M.cached_session_count = 0
+  M.sessions_data = {}
+  M.last_cursor_pos = nil
+  
+  -- Force garbage collection
+  collectgarbage("collect")
+end
+
 function M.destroy()
   M.cleanup_keymaps()
+  M.cleanup_all_caches()
   
   if utils.is_valid_window(M.window_id) then
     vim.api.nvim_win_close(M.window_id, true)
   end
   M.window_id = nil
   M.buffer_id = nil
+  M.namespace_id = nil
+  M.pending_buffer_update = false
 end
 
 function M.update_sessions(sessions, active_session_id, preserve_selection_position)
@@ -240,11 +259,27 @@ local function generate_cache_key()
   return table.concat(session_ids, "|") .. "|" .. (M.active_session_id or "") .. "|" .. M.selected_session_index
 end
 
+function M.cleanup_cache_if_needed()
+  -- If we have too many cached entries, clear cache to prevent memory bloat
+  if #M.sessions_data > M.cache_cleanup_threshold then
+    M.cached_content = nil
+    M.cached_highlights = nil
+    M.content_cache_key = nil
+    M.cached_width = nil
+    
+    -- Force garbage collection
+    collectgarbage("collect")
+  end
+end
+
 function M.generate_content()
   local cache_key = generate_cache_key()
   if M.cached_content and M.cached_highlights and M.content_cache_key == cache_key then
     return M.cached_content, M.cached_highlights
   end
+  
+  -- Check if we need to cleanup cache
+  M.cleanup_cache_if_needed()
   
   local lines = {}
   local highlights = {}
@@ -262,9 +297,12 @@ function M.generate_content()
   table.insert(lines, "")
    M.add_shortcuts_content(lines, highlights)
   
-  M.cached_content = lines
-  M.cached_highlights = highlights
-  M.content_cache_key = cache_key
+  -- Only cache if we're within reasonable limits
+  if #M.sessions_data <= M.max_cache_entries then
+    M.cached_content = lines
+    M.cached_highlights = highlights
+    M.content_cache_key = cache_key
+  end
   
   return lines, highlights
 end

@@ -551,6 +551,9 @@ function M.refresh_manager(preserve_selection_position)
     return
   end
   
+  -- Trigger periodic cleanup during refresh
+  session_manager.periodic_cleanup()
+  
   local sessions = session_manager.get_all_sessions()
   local active_session = session_manager.get_active_session()
   local active_id = active_session and active_session.id or nil
@@ -822,6 +825,7 @@ end
 function M.show_stats()
   local uptime = (vim.loop.now() - M.stats.uptime_start) / 1000
   local session_count = session_manager.get_session_count()
+  local memory_stats = events.get_memory_stats()
   
   local stats_lines = {
     "Luxterm Statistics:",
@@ -830,7 +834,12 @@ function M.show_stats()
     string.format("Sessions created: %d", M.stats.sessions_created),
     string.format("Sessions deleted: %d", M.stats.sessions_deleted),
     string.format("Manager toggles: %d", M.stats.manager_toggles),
-    string.format("Active sessions: %d", session_count)
+    string.format("Active sessions: %d", session_count),
+    "",
+    "Memory Statistics:",
+    string.format("Event handlers: %d", memory_stats.total_handlers),
+    string.format("Event types: %d", memory_stats.event_types),
+    string.format("Memory usage: %.2f MB", memory_stats.memory_usage / 1024 / 1024)
   }
   
   vim.notify(table.concat(stats_lines, "\n"), vim.log.levels.INFO)
