@@ -325,6 +325,12 @@ function M.open_manager()
   local row, col = utils.calculate_centered_position(total_width, total_height)
   
   if M.config.preview_enabled then
+    -- Calculate dynamic left panel width based on session list content
+    local session_list = require("luxterm.ui.session_list")
+    local required_width = session_list.calculate_required_width() + 2
+    local left_width = math.min(required_width, math.floor(total_width * 0.6)) -- Cap at 60% max
+    local left_width_ratio = left_width / total_width
+    
     -- Create split layout
     local base_config = {
       width = total_width,
@@ -336,7 +342,7 @@ function M.open_manager()
     
     local left_config = {
       title = " Sessions ",
-      width_ratio = 0.25,
+      width_ratio = left_width_ratio,
       enter = true,
       buffer_options = {filetype = "luxterm_main"},
       auto_hide = M.config.auto_hide,
