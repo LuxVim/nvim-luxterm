@@ -17,6 +17,36 @@ function M.setup(opts)
   highlights.setup_session_highlights()
 end
 
+function M.calculate_required_width()
+  -- Calculate width based on shortcuts content with 2 chars padding after "[Esc]"
+  local shortcuts = {
+    {icon = "󰷈", label = "New session", key = "[n]"},
+    {icon = "󰆴", label = "Delete session", key = "[d]"},
+    {icon = "󰑕", label = "Rename session", key = "[r]"},
+    {icon = "󰅖", label = "Close", key = "[Esc]"}
+  }
+  
+  -- If no sessions, use minimal shortcuts
+  if #M.sessions_data == 0 then
+    shortcuts = {
+      {icon = "󰷈", label = "New session", key = "[n]"},
+      {icon = "󰅖", label = "Close", key = "[Esc]"}
+    }
+  end
+  
+  local max_width = 0
+  for _, item in ipairs(shortcuts) do
+    local content = "  " .. item.icon .. "  " .. item.label
+    local content_width = vim.fn.strdisplaywidth(content)
+    local key_width = vim.fn.strdisplaywidth(item.key)
+    local total_width = content_width + key_width + 2  -- 2 chars padding after key
+    max_width = math.max(max_width, total_width)
+  end
+  
+  -- Add some minimum width and ensure it's reasonable
+  return math.max(max_width, 30)
+end
+
 
 function M.create_window(config)
   config = config or {}
@@ -25,8 +55,9 @@ function M.create_window(config)
     M.destroy()
   end
   
-  -- Calculate window size
-  local width = config.width or utils.calculate_size_from_ratio(0.25, 0.6)
+  -- Calculate dynamic window width based on content
+  local content_width = M.calculate_required_width()
+  local width = config.width or content_width
   local height = config.height or select(2, utils.calculate_size_from_ratio(0.25, 0.6))
   local row = config.row or utils.calculate_centered_position(width, height)
   local col = config.col or select(2, utils.calculate_centered_position(width, height))
@@ -297,10 +328,16 @@ function M.add_shortcuts_content(lines, highlights)
     }
   end
   
+  -- Calculate dynamic width for consistent spacing
+  local required_width = M.calculate_required_width()
+  
   for _, item in ipairs(shortcuts) do
     local line_num = #lines
     local content = "  " .. item.icon .. "  " .. item.label
-    local padding = string.rep(" ", 25 - vim.fn.strdisplaywidth(content))
+    local content_width = vim.fn.strdisplaywidth(content)
+    local key_width = vim.fn.strdisplaywidth(item.key)
+    local padding_needed = required_width - content_width - key_width
+    local padding = string.rep(" ", padding_needed)
     local full_line = content .. padding .. item.key
     
     table.insert(lines, full_line)
