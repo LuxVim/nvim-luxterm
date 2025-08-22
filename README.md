@@ -5,7 +5,7 @@
   nvim-luxterm
 </h1>
 
-A floating-window terminal session manager for Neovim, offering elegant multi-terminal organization, live previews, and intuitive navigation with modern UI design. Manage, switch, and customize multiple terminals effortlessly.
+A floating-window terminal session manager, offering elegant multi-terminal organization, live previews, and intuitive navigation with modern UI design. Manage, switch, and customize multiple terminals effortlessly.
 
 ---
 
