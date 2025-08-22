@@ -45,6 +45,25 @@ function M.clear_all()
   M.handlers = {}
 end
 
+function M.cleanup_event_handlers()
+  local handler_count = 0
+  for event_type, handlers in pairs(M.handlers) do
+    handler_count = handler_count + #handlers
+  end
+  
+  M.handlers = {}
+  
+  return handler_count
+end
+
+function M.get_handler_count()
+  local count = 0
+  for event_type, handlers in pairs(M.handlers) do
+    count = count + #handlers
+  end
+  return count
+end
+
 -- Event type constants
 M.SESSION_CREATED = "session_created"
 M.SESSION_DELETED = "session_deleted"

@@ -14,7 +14,8 @@ local M = {
   cached_session_count = 0,
   cached_content = nil,
   cached_highlights = nil,
-  content_cache_key = nil
+  content_cache_key = nil,
+  keymap_handlers = {}
 }
 
 
@@ -94,7 +95,21 @@ function M.create_window(config)
   return M.window_id, M.buffer_id
 end
 
+function M.cleanup_keymaps()
+  if M.buffer_id then
+    for keymap_spec, _ in pairs(M.keymap_handlers) do
+      local mode, key = keymap_spec:match("(%w+):(.+)")
+      if mode and key then
+        pcall(vim.keymap.del, mode, key, {buffer = M.buffer_id})
+      end
+    end
+    M.keymap_handlers = {}
+  end
+end
+
 function M.destroy()
+  M.cleanup_keymaps()
+  
   if utils.is_valid_window(M.window_id) then
     vim.api.nvim_win_close(M.window_id, true)
   end
@@ -462,6 +477,9 @@ function M.setup_keymaps()
   -- Apply all keymaps in batch
   for _, keymap in ipairs(keymaps) do
     vim.keymap.set(keymap[1], keymap[2], keymap[3], opts)
+    -- Track keymaps for cleanup
+    local keymap_spec = keymap[1] .. ":" .. keymap[2]
+    M.keymap_handlers[keymap_spec] = true
   end
 end
 

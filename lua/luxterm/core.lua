@@ -18,7 +18,9 @@ local M = {
     uptime_start = nil
   },
   refresh_timer = nil,
-  manager_refresh_timer = nil
+  manager_refresh_timer = nil,
+  autocmd_ids = {},
+  keymap_ids = {}
 }
 
 -- Debounced refresh function to prevent excessive updates
@@ -308,16 +310,23 @@ function M.setup_terminal_keymaps(bufnr)
     return false
   end
   
+  -- Store keymaps for cleanup
+  if not M.keymap_ids[bufnr] then
+    M.keymap_ids[bufnr] = {}
+  end
+  
   if next_key and not is_blacklisted(next_key) then
     vim.keymap.set("t", next_key, function()
       M.switch_to_next_session()
     end, vim.tbl_extend("force", opts, {desc = "Next terminal session"}))
+    M.keymap_ids[bufnr]["next"] = next_key
   end
   
   if prev_key and not is_blacklisted(prev_key) then
     vim.keymap.set("t", prev_key, function()
       M.switch_to_previous_session()
     end, vim.tbl_extend("force", opts, {desc = "Previous terminal session"}))
+    M.keymap_ids[bufnr]["prev"] = prev_key
   end
 end
 
@@ -454,37 +463,56 @@ function M.setup_manager_close_handler()
     local right_winid = M.manager_layout.windows.right.winid
     
     if left_winid then
-      vim.api.nvim_create_autocmd("WinClosed", {
+      local autocmd_id = vim.api.nvim_create_autocmd("WinClosed", {
         pattern = tostring(left_winid),
         callback = function()
+          M.cleanup_manager_autocmd(autocmd_id)
           M.close_manager()
         end,
         once = true
       })
+      M.autocmd_ids[autocmd_id] = true
     end
     
     if right_winid then
-      vim.api.nvim_create_autocmd("WinClosed", {
+      local autocmd_id = vim.api.nvim_create_autocmd("WinClosed", {
         pattern = tostring(right_winid),
         callback = function()
+          M.cleanup_manager_autocmd(autocmd_id)
           M.close_manager()
         end,
         once = true
       })
+      M.autocmd_ids[autocmd_id] = true
     end
   else
     -- Single window layout
     local winid_to_watch = M.manager_layout.window_id
     if winid_to_watch then
-      vim.api.nvim_create_autocmd("WinClosed", {
+      local autocmd_id = vim.api.nvim_create_autocmd("WinClosed", {
         pattern = tostring(winid_to_watch),
         callback = function()
+          M.cleanup_manager_autocmd(autocmd_id)
           M.close_manager()
         end,
         once = true
       })
+      M.autocmd_ids[autocmd_id] = true
     end
   end
+end
+
+function M.cleanup_manager_autocmd(autocmd_id)
+  if M.autocmd_ids[autocmd_id] then
+    M.autocmd_ids[autocmd_id] = nil
+  end
+end
+
+function M.cleanup_all_manager_autocmds()
+  for autocmd_id, _ in pairs(M.autocmd_ids) do
+    pcall(vim.api.nvim_del_autocmd, autocmd_id)
+  end
+  M.autocmd_ids = {}
 end
 
 function M.close_manager()
@@ -494,6 +522,9 @@ function M.close_manager()
   
   local layout = M.manager_layout
   M.manager_layout = nil  -- Set to nil first to prevent re-entry
+  
+  -- Clean up all manager autocmds
+  M.cleanup_all_manager_autocmds()
   
   if layout.type == "split" then
     if layout.windows and layout.windows.left then
@@ -577,8 +608,16 @@ function M.delete_session(session_id, opts)
     end
   end
   
+  local session = session_manager.get_session(session_id)
+  local bufnr = session and session.bufnr or nil
+  
   local success = session_manager.delete_session(session_id)
   if success then
+    -- Clean up keymaps for this session
+    if bufnr then
+      M.cleanup_session_keymaps(bufnr)
+    end
+    
     events.emit(events.SESSION_DELETED, {session_id = session_id})
     if M.is_manager_open() then
       debounced_manager_refresh(true)
@@ -791,6 +830,21 @@ function M.show_stats()
   vim.notify(table.concat(stats_lines, "\n"), vim.log.levels.INFO)
 end
 
+function M.cleanup_session_keymaps(bufnr)
+  if M.keymap_ids[bufnr] then
+    for _, key in pairs(M.keymap_ids[bufnr]) do
+      pcall(vim.keymap.del, "t", key, {buffer = bufnr})
+    end
+    M.keymap_ids[bufnr] = nil
+  end
+end
+
+function M.cleanup_all_session_keymaps()
+  for bufnr, _ in pairs(M.keymap_ids) do
+    M.cleanup_session_keymaps(bufnr)
+  end
+end
+
 function M.cleanup()
   if not M.initialized then
     return
@@ -807,6 +861,10 @@ function M.cleanup()
     M.manager_refresh_timer:close()
     M.manager_refresh_timer = nil
   end
+  
+  -- Clean up all autocmds and keymaps
+  M.cleanup_all_manager_autocmds()
+  M.cleanup_all_session_keymaps()
   
   M.close_manager()
   events.clear_all()
