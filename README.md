@@ -141,15 +141,13 @@ When the session manager is open:
 ## 🔧 Lua API
 
 ```lua
-local luxterm = require("luxterm")
+-- Get API after setup
+local luxterm = require("luxterm").setup()
 
 -- Create and manage sessions
 local session = luxterm.create_session({ name = "work", activate = true })
-luxterm.delete_session(session.id)
+luxterm.delete_session(session.id, { confirm = true })
 luxterm.switch_session(session.id)
-
--- Session navigation
--- Use :LuxtermNext and :LuxtermPrev commands
 
 -- Manager control
 luxterm.toggle_manager()
@@ -203,7 +201,17 @@ require("luxterm").setup({
 })
 ```
 
-When `global_session_nav` is enabled, you can cycle through terminal sessions from anywhere in Neovim. The navigation automatically opens the selected session in a floating window and closes any previously opened session windows.
+When `global_session_nav` is enabled, you can cycle through terminal sessions from anywhere in Neovim using the configured keybindings. The navigation automatically opens the selected session in a floating window and closes any previously opened session windows. Session navigation also works from within terminal mode using the same keybindings.
+
+### Configuration Presets
+The plugin includes built-in configuration presets for common use cases:
+
+```lua
+-- Apply a preset after setup
+require("luxterm.config").apply_preset("minimal")    -- No preview, smaller window
+require("luxterm.config").apply_preset("compact")    -- 60% screen, preview enabled
+require("luxterm.config").apply_preset("full_screen") -- 95% screen, no auto-hide
+```
 
 ### Custom Keybindings
 ```lua
@@ -235,18 +243,22 @@ vim.keymap.set("n", "<leader>th", ":LuxtermPrev<CR>", { desc = "Previous termina
 - Disable preview pane if experiencing lag: `preview_enabled = false`
 - Check stats with `:LuxtermStats` to monitor resource usage
 - Large terminal histories may affect preview rendering
+- Plugin uses debounced refresh timers and batched operations for optimal performance
 
 ### Debug Information
 
 ```lua
--- Check plugin status
+-- Check plugin status and performance metrics
 :LuxtermStats
 
--- List all sessions
+-- List all sessions with status
 :LuxtermList
 
 -- Verify configuration
 :lua print(vim.inspect(require("luxterm").get_config()))
+
+-- Test configuration presets
+:lua require("luxterm.config").apply_preset("minimal")
 ```
 
 ---
