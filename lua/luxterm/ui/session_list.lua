@@ -9,7 +9,12 @@ local M = {
   buffer_id = nil,
   sessions_data = {},
   active_session_id = nil,
-  selected_session_index = 1
+  selected_session_index = 1,
+  cached_width = nil,
+  cached_session_count = 0,
+  cached_content = nil,
+  cached_highlights = nil,
+  content_cache_key = nil
 }
 
 
@@ -18,6 +23,11 @@ function M.setup(opts)
 end
 
 function M.calculate_required_width()
+  local session_count = #M.sessions_data
+  if M.cached_width and M.cached_session_count == session_count then
+    return M.cached_width
+  end
+  
   -- Calculate width based on shortcuts content with 2 chars padding after "[Esc]"
   local shortcuts = {
     {icon = "󰷈", label = "New session", key = "[n]"},
@@ -27,7 +37,7 @@ function M.calculate_required_width()
   }
   
   -- If no sessions, use minimal shortcuts
-  if #M.sessions_data == 0 then
+  if session_count == 0 then
     shortcuts = {
       {icon = "󰷈", label = "New session", key = "[n]"},
       {icon = "󰅖", label = "Close", key = "[Esc]"}
@@ -44,7 +54,12 @@ function M.calculate_required_width()
   end
   
   -- Add some minimum width and ensure it's reasonable
-  return math.max(max_width, 30)
+  local calculated_width = math.max(max_width, 30)
+  
+  M.cached_width = calculated_width
+  M.cached_session_count = session_count
+  
+  return calculated_width
 end
 
 
@@ -90,6 +105,13 @@ end
 function M.update_sessions(sessions, active_session_id, preserve_selection_position)
   M.sessions_data = sessions or {}
   M.active_session_id = active_session_id
+  
+  if #M.sessions_data ~= M.cached_session_count then
+    M.cached_width = nil
+    M.cached_content = nil
+    M.cached_highlights = nil 
+    M.content_cache_key = nil
+  end
   
   -- Ensure valid selection
   if #M.sessions_data > 0 then
@@ -140,7 +162,20 @@ function M.render()
   end
 end
 
+local function generate_cache_key()
+  local session_ids = {}
+  for i, session in ipairs(M.sessions_data) do
+    table.insert(session_ids, session.id .. ":" .. session.name .. ":" .. session:get_status())
+  end
+  return table.concat(session_ids, "|") .. "|" .. (M.active_session_id or "") .. "|" .. M.selected_session_index
+end
+
 function M.generate_content()
+  local cache_key = generate_cache_key()
+  if M.cached_content and M.cached_highlights and M.content_cache_key == cache_key then
+    return M.cached_content, M.cached_highlights
+  end
+  
   local lines = {}
   local highlights = {}
   
@@ -156,6 +191,10 @@ function M.generate_content()
   table.insert(lines, "")
   table.insert(lines, "")
    M.add_shortcuts_content(lines, highlights)
+  
+  M.cached_content = lines
+  M.cached_highlights = highlights
+  M.content_cache_key = cache_key
   
   return lines, highlights
 end

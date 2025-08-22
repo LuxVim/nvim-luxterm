@@ -4,7 +4,8 @@ local utils = require("luxterm.utils")
 local M = {
   sessions = {},
   active_session_id = nil,
-  next_id = 1
+  next_id = 1,
+  buffer_session_map = {}
 }
 
 -- Smart line truncation for terminal content preview
@@ -229,6 +230,7 @@ function M.create_session(opts)
   })
   
   M.sessions[session.id] = session
+  M.buffer_session_map[session.bufnr] = session.id
   
   if opts.activate ~= false then
     session:activate()
@@ -246,6 +248,10 @@ function M.delete_session(session_id, skip_buffer_delete)
   -- Close terminal buffer if valid and not already being deleted
   if not skip_buffer_delete and session:is_valid() then
     vim.api.nvim_buf_delete(session.bufnr, {force = true})
+  end
+  
+  if session.bufnr then
+    M.buffer_session_map[session.bufnr] = nil
   end
   
   M.sessions[session_id] = nil
@@ -271,6 +277,11 @@ end
 
 function M.get_session(session_id)
   return M.sessions[session_id]
+end
+
+function M.get_session_by_buffer(bufnr)
+  local session_id = M.buffer_session_map[bufnr]
+  return session_id and M.sessions[session_id] or nil
 end
 
 function M.get_active_session()

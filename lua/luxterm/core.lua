@@ -133,19 +133,15 @@ function M.setup_autocmds()
   vim.api.nvim_create_autocmd({"TextChanged", "TextChangedI", "TextChangedP"}, {
     group = vim.api.nvim_create_augroup("LuxtermContentUpdate", {clear = true}),
     callback = function(args)
-      -- Only refresh if this is a terminal buffer managed by luxterm
       if vim.bo[args.buf].buftype == "terminal" then
-        local sessions = session_manager.get_all_sessions()
-        for _, session in ipairs(sessions) do
-          if session.bufnr == args.buf then
-            -- Debounce the refresh to avoid excessive updates
-            vim.defer_fn(function()
-              if M.is_manager_open() and M.config.preview_enabled then
-                M.refresh_manager()
-              end
-            end, 100)
-            break
-          end
+        local session = session_manager.get_session_by_buffer(args.buf)
+        if session then
+          -- Debounce the refresh to avoid excessive updates
+          vim.defer_fn(function()
+            if M.is_manager_open() and M.config.preview_enabled then
+              M.refresh_manager()
+            end
+          end, 100)
         end
       end
     end
@@ -157,12 +153,9 @@ function M.handle_terminal_opened(bufnr)
     return
   end
   
-  -- Check if this terminal is already managed
-  local sessions = session_manager.get_all_sessions()
-  for _, session in ipairs(sessions) do
-    if session.bufnr == bufnr then
-      return -- Already managed
-    end
+  local existing_session = session_manager.get_session_by_buffer(bufnr)
+  if existing_session then
+    return -- Already managed
   end
   
   -- Only auto-manage terminals with "luxterm" in their name
@@ -226,20 +219,11 @@ function M.setup_global_keymaps()
 end
 
 function M.setup_terminal_keymaps(bufnr)
-  -- Only set up keymaps for luxterm-managed terminals
-  local sessions = session_manager.get_all_sessions()
-  local is_luxterm_terminal = false
-  
-  for _, session in ipairs(sessions) do
-    if session.bufnr == bufnr then
-      is_luxterm_terminal = true
-      break
-    end
-  end
+  local session = session_manager.get_session_by_buffer(bufnr)
   
   -- STRICT filtering: Only set up keymaps for terminals that are definitely luxterm sessions
   -- Do NOT set up keymaps based on buffer name matching - this is too broad and interferes with other terminals
-  if not is_luxterm_terminal then
+  if not session then
     return
   end
   
@@ -677,8 +661,6 @@ function M.rename_selected_session()
 end
 
 function M.close_all_session_windows()
-  -- Close all floating windows that contain session terminal buffers
-  local sessions = session_manager.get_all_sessions()
   local closed_count = 0
   
   for _, win in ipairs(vim.api.nvim_list_wins()) do
@@ -688,12 +670,10 @@ function M.close_all_session_windows()
       
       -- Check if this is a terminal window with a session buffer
       if filetype == "terminal" or vim.api.nvim_buf_get_option(buf, "buftype") == "terminal" then
-        for _, session in ipairs(sessions) do
-          if session.bufnr == buf then
-            floating_window.close_window(win)
-            closed_count = closed_count + 1
-            break
-          end
+        local session = session_manager.get_session_by_buffer(buf)
+        if session then
+          floating_window.close_window(win)
+          closed_count = closed_count + 1
         end
       end
     end
