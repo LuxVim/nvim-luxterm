@@ -16,8 +16,73 @@ local M = {
     sessions_deleted = 0,
     manager_toggles = 0,
     uptime_start = nil
-  }
+  },
+  refresh_timer = nil,
+  manager_refresh_timer = nil
 }
+
+-- Debounced refresh function to prevent excessive updates
+local function debounced_refresh()
+  if M.refresh_timer then
+    M.refresh_timer:stop()
+    M.refresh_timer:close()
+  end
+  
+  M.refresh_timer = vim.loop.new_timer()
+  M.refresh_timer:start(100, 0, vim.schedule_wrap(function()
+    if M.is_manager_open() and M.config.preview_enabled then
+      M.refresh_manager()
+    end
+    M.refresh_timer:close()
+    M.refresh_timer = nil
+  end))
+end
+
+-- Debounced manager refresh to prevent excessive UI updates
+local function debounced_manager_refresh(preserve_selection_position)
+  if M.manager_refresh_timer then
+    M.manager_refresh_timer:stop()
+    M.manager_refresh_timer:close()
+  end
+  
+  M.manager_refresh_timer = vim.loop.new_timer()
+  M.manager_refresh_timer:start(50, 0, vim.schedule_wrap(function()
+    if M.is_manager_open() then
+      M.refresh_manager(preserve_selection_position)
+    end
+    M.manager_refresh_timer:close()
+    M.manager_refresh_timer = nil
+  end))
+end
+
+-- Batched window operations helper to reduce API calls
+local function process_session_windows(operations)
+  local results = {}
+  
+  for _, win in ipairs(vim.api.nvim_list_wins()) do
+    if vim.api.nvim_win_is_valid(win) and floating_window.is_floating_window(win) then
+      local buf = vim.api.nvim_win_get_buf(win)
+      local filetype = vim.api.nvim_buf_get_option(buf, "filetype")
+      
+      if filetype == "terminal" or vim.api.nvim_buf_get_option(buf, "buftype") == "terminal" then
+        local session = session_manager.get_session_by_buffer(buf)
+        if session then
+          for _, operation in ipairs(operations) do
+            local result = operation.func(win, buf, session)
+            if operation.collect_results then
+              table.insert(results, result)
+            end
+            if result and operation.early_exit then
+              return results
+            end
+          end
+        end
+      end
+    end
+  end
+  
+  return results
+end
 
 -- Default configuration
 local default_config = {
@@ -136,12 +201,7 @@ function M.setup_autocmds()
       if vim.bo[args.buf].buftype == "terminal" then
         local session = session_manager.get_session_by_buffer(args.buf)
         if session then
-          -- Debounce the refresh to avoid excessive updates
-          vim.defer_fn(function()
-            if M.is_manager_open() and M.config.preview_enabled then
-              M.refresh_manager()
-            end
-          end, 100)
+          debounced_refresh()
         end
       end
     end
@@ -490,7 +550,7 @@ function M.create_session(opts)
   events.emit(events.SESSION_CREATED, {session = session})
   
   if M.is_manager_open() then
-    M.refresh_manager()
+    debounced_manager_refresh()
   end
   
   if opts.focus_on_create or M.config.focus_on_create then
@@ -521,7 +581,7 @@ function M.delete_session(session_id, opts)
   if success then
     events.emit(events.SESSION_DELETED, {session_id = session_id})
     if M.is_manager_open() then
-      M.refresh_manager(true)  -- Preserve selection position after deletion
+      debounced_manager_refresh(true)
     end
   end
   
@@ -550,7 +610,7 @@ function M.delete_sessions_by_pattern(pattern)
     events.emit(events.SESSION_DELETED, {session_id = session.id})
   end
   if M.is_manager_open() then
-    M.refresh_manager(true)  -- Preserve selection position after deletion
+    debounced_manager_refresh(true)
   end
   return deleted
 end
@@ -560,7 +620,7 @@ function M.switch_session(session_id)
   if session then
     events.emit(events.SESSION_SWITCHED, {session = session})
     if M.is_manager_open() then
-      M.refresh_manager()
+      debounced_manager_refresh()
     end
   end
   return session
@@ -574,7 +634,7 @@ function M.switch_to_next_session()
   if session then
     events.emit(events.SESSION_SWITCHED, {session = session})
     if M.is_manager_open() then
-      M.refresh_manager()
+      debounced_manager_refresh()
     end
     M.open_session_window(session)
   end
@@ -589,7 +649,7 @@ function M.switch_to_previous_session()
   if session then
     events.emit(events.SESSION_SWITCHED, {session = session})
     if M.is_manager_open() then
-      M.refresh_manager()
+      debounced_manager_refresh()
     end
     M.open_session_window(session)
   end
@@ -652,7 +712,7 @@ function M.rename_selected_session()
       M.update_session_window_title(session)
       
       if M.is_manager_open() then
-        M.refresh_manager()
+        debounced_manager_refresh()
       end
     end
   end)
@@ -661,25 +721,17 @@ function M.rename_selected_session()
 end
 
 function M.close_all_session_windows()
-  local closed_count = 0
+  local results = process_session_windows({
+    {
+      func = function(win, buf, session)
+        floating_window.close_window(win)
+        return 1
+      end,
+      collect_results = true
+    }
+  })
   
-  for _, win in ipairs(vim.api.nvim_list_wins()) do
-    if vim.api.nvim_win_is_valid(win) and floating_window.is_floating_window(win) then
-      local buf = vim.api.nvim_win_get_buf(win)
-      local filetype = vim.api.nvim_buf_get_option(buf, "filetype")
-      
-      -- Check if this is a terminal window with a session buffer
-      if filetype == "terminal" or vim.api.nvim_buf_get_option(buf, "buftype") == "terminal" then
-        local session = session_manager.get_session_by_buffer(buf)
-        if session then
-          floating_window.close_window(win)
-          closed_count = closed_count + 1
-        end
-      end
-    end
-  end
-  
-  return closed_count
+  return #results
 end
 
 function M.update_session_window_title(session)
@@ -687,22 +739,23 @@ function M.update_session_window_title(session)
     return false
   end
   
-  -- Find any floating windows that contain this session's buffer
-  for _, win in ipairs(vim.api.nvim_list_wins()) do
-    if vim.api.nvim_win_is_valid(win) and floating_window.is_floating_window(win) then
-      local buf = vim.api.nvim_win_get_buf(win)
-      if buf == session.bufnr then
-        -- Update the window title
-        vim.api.nvim_win_set_config(win, {
-          title = " " .. session.name .. " ",
-          title_pos = "center"
-        })
-        return true
-      end
-    end
-  end
+  local results = process_session_windows({
+    {
+      func = function(win, buf, found_session)
+        if buf == session.bufnr then
+          vim.api.nvim_win_set_config(win, {
+            title = " " .. session.name .. " ",
+            title_pos = "center"
+          })
+          return true
+        end
+        return false
+      end,
+      early_exit = true
+    }
+  })
   
-  return false
+  return #results > 0
 end
 
 -- Utility functions
@@ -741,6 +794,18 @@ end
 function M.cleanup()
   if not M.initialized then
     return
+  end
+  
+  if M.refresh_timer then
+    M.refresh_timer:stop()
+    M.refresh_timer:close()
+    M.refresh_timer = nil
+  end
+  
+  if M.manager_refresh_timer then
+    M.manager_refresh_timer:stop()
+    M.manager_refresh_timer:close()
+    M.manager_refresh_timer = nil
   end
   
   M.close_manager()

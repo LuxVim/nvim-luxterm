@@ -434,27 +434,34 @@ function M.setup_keymaps()
   
   local opts = {noremap = true, silent = true, buffer = M.buffer_id}
   
-  -- Session actions
-  vim.keymap.set("n", "n", function() M.emit_action("new_session") end, opts)
-  vim.keymap.set("n", "d", function() M.emit_action("delete_session") end, opts)
-  vim.keymap.set("n", "r", function() M.emit_action("rename_session") end, opts)
-  vim.keymap.set("n", "<Esc>", function() M.emit_action("close_manager") end, opts)
-  vim.keymap.set("n", "<CR>", function() M.emit_action("open_session") end, opts)
+  -- Batch all keymap setups to reduce API calls
+  local keymaps = {
+    -- Session actions
+    {"n", "n", function() M.emit_action("new_session") end},
+    {"n", "d", function() M.emit_action("delete_session") end},
+    {"n", "r", function() M.emit_action("rename_session") end},
+    {"n", "<Esc>", function() M.emit_action("close_manager") end},
+    {"n", "<CR>", function() M.emit_action("open_session") end},
+    -- Navigation
+    {"n", "j", function() M.navigate("down") end},
+    {"n", "k", function() M.navigate("up") end},
+    {"n", "<Down>", function() M.navigate("down") end},
+    {"n", "<Up>", function() M.navigate("up") end}
+  }
   
-  -- Navigation
-  vim.keymap.set("n", "j", function() M.navigate("down") end, opts)
-  vim.keymap.set("n", "k", function() M.navigate("up") end, opts)
-  vim.keymap.set("n", "<Down>", function() M.navigate("down") end, opts)
-  vim.keymap.set("n", "<Up>", function() M.navigate("up") end, opts)
-  
-  -- Number keys for direct selection by session number
+  -- Add number keys for direct selection
   for i = 1, 9 do
-    vim.keymap.set("n", tostring(i), function() 
+    table.insert(keymaps, {"n", tostring(i), function() 
       local session, index = M.get_session_by_number(i)
       if session then
         M.emit_action("select_session", {index = index}) 
       end
-    end, opts)
+    end})
+  end
+  
+  -- Apply all keymaps in batch
+  for _, keymap in ipairs(keymaps) do
+    vim.keymap.set(keymap[1], keymap[2], keymap[3], opts)
   end
 end
 
