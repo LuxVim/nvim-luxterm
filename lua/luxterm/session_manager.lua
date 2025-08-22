@@ -4,7 +4,12 @@ local utils = require("luxterm.utils")
 local M = {
   sessions = {},
   active_session_id = nil,
-  next_id = 1
+  next_id = 1,
+  buffer_session_map = {},
+  max_sessions = 50,
+  max_preview_lines = 100,
+  last_cleanup_time = 0,
+  cleanup_interval = 300000 -- 5 minutes in milliseconds
 }
 
 -- Smart line truncation for terminal content preview
@@ -168,18 +173,29 @@ local function create_session(opts)
       return {"[Terminal stopped]"}
     end
     
-    -- Get all lines from terminal buffer first
-    local all_lines = vim.api.nvim_buf_get_lines(self.bufnr, 0, -1, false)
+    -- Get buffer lines with memory-conscious limit
+    local max_lines_to_read = math.min(M.max_preview_lines, 1000)
+    local all_lines = vim.api.nvim_buf_get_lines(self.bufnr, -max_lines_to_read, -1, false)
     if #all_lines == 0 then
       return {"[Empty terminal]"}
     end
     
-    -- Get the last 20 non-empty lines
+    -- Get the last 20 non-empty lines with size limit
     local lines = {}
+    local total_chars = 0
+    local max_total_chars = 4000 -- Limit total preview content size
+    
     for i = #all_lines, 1, -1 do
       local line = all_lines[i]
       if line and #line > 0 then
+        -- Check memory limit
+        if total_chars + #line > max_total_chars then
+          break
+        end
+        
         table.insert(lines, 1, line) -- Insert at beginning to maintain order
+        total_chars = total_chars + #line
+        
         if #lines >= 20 then
           break
         end
@@ -229,6 +245,7 @@ function M.create_session(opts)
   })
   
   M.sessions[session.id] = session
+  M.buffer_session_map[session.bufnr] = session.id
   
   if opts.activate ~= false then
     session:activate()
@@ -243,11 +260,28 @@ function M.delete_session(session_id, skip_buffer_delete)
     return false
   end
   
+  -- Clean up all references to prevent memory leaks
+  local bufnr = session.bufnr
+  
   -- Close terminal buffer if valid and not already being deleted
   if not skip_buffer_delete and session:is_valid() then
-    vim.api.nvim_buf_delete(session.bufnr, {force = true})
+    vim.api.nvim_buf_delete(bufnr, {force = true})
   end
   
+  -- Clean up buffer mapping
+  if bufnr then
+    M.buffer_session_map[bufnr] = nil
+  end
+  
+  -- Clear session object references
+  if session then
+    session.bufnr = nil
+    session.name = nil
+    session.created_at = nil
+    session.last_accessed = nil
+  end
+  
+  -- Remove from sessions table
   M.sessions[session_id] = nil
   
   -- Update active session if needed
@@ -271,6 +305,11 @@ end
 
 function M.get_session(session_id)
   return M.sessions[session_id]
+end
+
+function M.get_session_by_buffer(bufnr)
+  local session_id = M.buffer_session_map[bufnr]
+  return session_id and M.sessions[session_id] or nil
 end
 
 function M.get_active_session()
@@ -399,6 +438,55 @@ function M.cleanup_invalid_sessions()
   end
   
   return #to_delete
+end
+
+function M.enforce_session_limits()
+  local session_count = vim.tbl_count(M.sessions)
+  
+  if session_count > M.max_sessions then
+    -- Get oldest sessions by creation time
+    local sessions_by_age = {}
+    for _, session in pairs(M.sessions) do
+      table.insert(sessions_by_age, session)
+    end
+    
+    table.sort(sessions_by_age, function(a, b)
+      return a.created_at < b.created_at
+    end)
+    
+    -- Delete oldest sessions beyond limit
+    local to_delete = session_count - M.max_sessions
+    for i = 1, to_delete do
+      if sessions_by_age[i] and sessions_by_age[i].id ~= M.active_session_id then
+        M.delete_session(sessions_by_age[i].id)
+      end
+    end
+    
+    return to_delete
+  end
+  
+  return 0
+end
+
+function M.periodic_cleanup()
+  local current_time = vim.loop.now()
+  
+  -- Only run cleanup every 5 minutes
+  if current_time - M.last_cleanup_time < M.cleanup_interval then
+    return 0, 0
+  end
+  
+  M.last_cleanup_time = current_time
+  
+  local cleaned_invalid = M.cleanup_invalid_sessions()
+  local cleaned_excess = M.enforce_session_limits()
+  
+  -- Force garbage collection after cleanup
+  if cleaned_invalid > 0 or cleaned_excess > 0 then
+    collectgarbage("collect")
+  end
+  
+  return cleaned_invalid, cleaned_excess
 end
 
 -- Setup autocmds for automatic cleanup

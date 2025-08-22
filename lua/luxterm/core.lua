@@ -6,58 +6,151 @@ local floating_window = require("luxterm.ui.floating_window")
 local events = require("luxterm.events")
 local highlights = require("luxterm.ui.highlights")
 local utils = require("luxterm.utils")
+local config = require("luxterm.config")
 
+-- Plugin state management
 local M = {
+  -- Core plugin state
   initialized = false,
-  config = {},
-  manager_layout = nil,
+  manager_layout = nil, -- Current manager window layout (split/single)
+  
+  -- Performance and usage statistics
   stats = {
     sessions_created = 0,
     sessions_deleted = 0,
     manager_toggles = 0,
     uptime_start = nil
-  }
+  },
+  
+  -- Debouncing timers for performance optimization
+  refresh_timer = nil,         -- Terminal content refresh debouncing
+  manager_refresh_timer = nil, -- Manager UI refresh debouncing
+  
+  -- Resource cleanup tracking
+  autocmd_ids = {},           -- Track autocmds for proper cleanup
+  keymap_ids = {}             -- Track keymaps for proper cleanup
 }
 
--- Default configuration
-local default_config = {
-  manager_width = 0.8,
-  manager_height = 0.8,
-  preview_enabled = true,
-  focus_on_create = false,
-  auto_hide = true,  -- Auto-hide floating windows when cursor leaves
-  keymaps = {
-    toggle_manager = "<C-/>",
-    next_session = "<C-k>",   -- Vi-style: k for up/next
-    prev_session = "<C-j>",   -- Vi-style: j for down/previous
-    global_session_nav = false
-  }
-}
+-- Configuration access helper
+local function get_config(key)
+  return config.get(key)
+end
 
+-- Debounced refresh function to prevent excessive updates
+local function debounced_refresh()
+  if M.refresh_timer then
+    M.refresh_timer:stop()
+    M.refresh_timer:close()
+  end
+  
+  M.refresh_timer = vim.loop.new_timer()
+  M.refresh_timer:start(100, 0, vim.schedule_wrap(function()
+    if M.is_manager_open() and get_config("preview_enabled") then
+      M.refresh_manager()
+    end
+    M.refresh_timer:close()
+    M.refresh_timer = nil
+  end))
+end
+
+-- Debounced manager refresh to prevent excessive UI updates
+local function debounced_manager_refresh(preserve_selection_position)
+  if M.manager_refresh_timer then
+    M.manager_refresh_timer:stop()
+    M.manager_refresh_timer:close()
+  end
+  
+  M.manager_refresh_timer = vim.loop.new_timer()
+  M.manager_refresh_timer:start(50, 0, vim.schedule_wrap(function()
+    if M.is_manager_open() then
+      M.refresh_manager(preserve_selection_position)
+    end
+    M.manager_refresh_timer:close()
+    M.manager_refresh_timer = nil
+  end))
+end
+
+-- Batched window operations helper to reduce API calls
+local function process_session_windows(operations)
+  local results = {}
+  
+  for _, win in ipairs(vim.api.nvim_list_wins()) do
+    if vim.api.nvim_win_is_valid(win) and floating_window.is_floating_window(win) then
+      local buf = vim.api.nvim_win_get_buf(win)
+      local filetype = vim.api.nvim_buf_get_option(buf, "filetype")
+      
+      if filetype == "terminal" or vim.api.nvim_buf_get_option(buf, "buftype") == "terminal" then
+        local session = session_manager.get_session_by_buffer(buf)
+        if session then
+          for _, operation in ipairs(operations) do
+            local result = operation.func(win, buf, session)
+            if operation.collect_results then
+              table.insert(results, result)
+            end
+            if result and operation.early_exit then
+              return results
+            end
+          end
+        end
+      end
+    end
+  end
+  
+  return results
+end
+
+-- Initialize all plugin components with error handling
+local function initialize_components()
+  local components = {
+    {"highlights", highlights.setup_all},
+    {"session_manager", session_manager.setup_autocmds},
+    {"session_list", session_list.setup},
+    {"preview_pane", preview_pane.setup}
+  }
+  
+  for _, component in ipairs(components) do
+    local name, setup_func = component[1], component[2]
+    utils.safe_call(setup_func, "Failed to initialize " .. name)
+  end
+end
+
+-- Setup core plugin functionality with comprehensive error handling
+local function setup_core_functionality()
+  local setup_functions = {
+    {"event handlers", M.setup_event_handlers},
+    {"autocmds", M.setup_autocmds},
+    {"user commands", M.setup_user_commands},
+    {"global keymaps", M.setup_global_keymaps},
+    {"existing terminal keymaps", M.setup_existing_terminal_keymaps}
+  }
+  
+  for _, setup_item in ipairs(setup_functions) do
+    local name, setup_func = setup_item[1], setup_item[2]
+    utils.safe_call(setup_func, "Failed to setup " .. name)
+  end
+end
+
+-- Main plugin setup function
+-- @param user_config table: User configuration options
+-- @return table: Plugin API functions
 function M.setup(user_config)
+  -- Prevent double initialization
   if M.initialized then
     return M.get_api()
   end
   
-  M.config = vim.tbl_deep_extend("force", default_config, user_config or {})
+  -- Setup and validate configuration
+  config.setup(user_config)
   M.stats.uptime_start = vim.loop.now()
   
-  -- Initialize components
-  highlights.setup_all()
-  session_manager.setup_autocmds()
-  session_list.setup()
-  preview_pane.setup()
-  
-  
-  M.setup_event_handlers()
-  M.setup_autocmds()
-  M.setup_user_commands()
-  M.setup_global_keymaps()
-  M.setup_existing_terminal_keymaps()
+  -- Initialize all components and functionality
+  initialize_components()
+  setup_core_functionality()
   
   M.initialized = true
   
-  events.emit(events.MANAGER_OPENED, {config = M.config})
+  -- Notify system that plugin is ready
+  events.emit(events.MANAGER_OPENED, {config = config.get()})
   
   return M.get_api()
 end
@@ -133,19 +226,10 @@ function M.setup_autocmds()
   vim.api.nvim_create_autocmd({"TextChanged", "TextChangedI", "TextChangedP"}, {
     group = vim.api.nvim_create_augroup("LuxtermContentUpdate", {clear = true}),
     callback = function(args)
-      -- Only refresh if this is a terminal buffer managed by luxterm
       if vim.bo[args.buf].buftype == "terminal" then
-        local sessions = session_manager.get_all_sessions()
-        for _, session in ipairs(sessions) do
-          if session.bufnr == args.buf then
-            -- Debounce the refresh to avoid excessive updates
-            vim.defer_fn(function()
-              if M.is_manager_open() and M.config.preview_enabled then
-                M.refresh_manager()
-              end
-            end, 100)
-            break
-          end
+        local session = session_manager.get_session_by_buffer(args.buf)
+        if session then
+          debounced_refresh()
         end
       end
     end
@@ -157,12 +241,9 @@ function M.handle_terminal_opened(bufnr)
     return
   end
   
-  -- Check if this terminal is already managed
-  local sessions = session_manager.get_all_sessions()
-  for _, session in ipairs(sessions) do
-    if session.bufnr == bufnr then
-      return -- Already managed
-    end
+  local existing_session = session_manager.get_session_by_buffer(bufnr)
+  if existing_session then
+    return -- Already managed
   end
   
   -- Only auto-manage terminals with "luxterm" in their name
@@ -210,44 +291,37 @@ end
 function M.setup_global_keymaps()
   local opts = {noremap = true, silent = true}
   
-  vim.keymap.set({"n", "t"}, M.config.keymaps.toggle_manager, function()
+  vim.keymap.set({"n", "t"}, get_config("keymaps").toggle_manager, function()
     M.toggle_manager()
   end, vim.tbl_extend("force", opts, {desc = "Toggle Luxterm manager"}))
   
-  if M.config.keymaps.global_session_nav then
-    vim.keymap.set("n", M.config.keymaps.next_session, function()
+  local keymaps = get_config("keymaps")
+  if keymaps.global_session_nav then
+    vim.keymap.set("n", keymaps.next_session, function()
       M.switch_to_next_session()
     end, vim.tbl_extend("force", opts, {desc = "Next terminal session"}))
     
-    vim.keymap.set("n", M.config.keymaps.prev_session, function()
+    vim.keymap.set("n", keymaps.prev_session, function()
       M.switch_to_previous_session()
     end, vim.tbl_extend("force", opts, {desc = "Previous terminal session"}))
   end
 end
 
 function M.setup_terminal_keymaps(bufnr)
-  -- Only set up keymaps for luxterm-managed terminals
-  local sessions = session_manager.get_all_sessions()
-  local is_luxterm_terminal = false
-  
-  for _, session in ipairs(sessions) do
-    if session.bufnr == bufnr then
-      is_luxterm_terminal = true
-      break
-    end
-  end
+  local session = session_manager.get_session_by_buffer(bufnr)
   
   -- STRICT filtering: Only set up keymaps for terminals that are definitely luxterm sessions
   -- Do NOT set up keymaps based on buffer name matching - this is too broad and interferes with other terminals
-  if not is_luxterm_terminal then
+  if not session then
     return
   end
   
   local opts = {noremap = true, silent = true, buffer = bufnr}
   
   -- Set up session navigation keybindings for terminal mode
-  local next_key = M.config.keymaps.next_session
-  local prev_key = M.config.keymaps.prev_session
+  local keymaps = get_config("keymaps")
+  local next_key = keymaps.next_session
+  local prev_key = keymaps.prev_session
   
   -- Blacklist of keys that should never be mapped in terminal mode
   local blacklisted_keys = {
@@ -264,16 +338,23 @@ function M.setup_terminal_keymaps(bufnr)
     return false
   end
   
+  -- Store keymaps for cleanup
+  if not M.keymap_ids[bufnr] then
+    M.keymap_ids[bufnr] = {}
+  end
+  
   if next_key and not is_blacklisted(next_key) then
     vim.keymap.set("t", next_key, function()
       M.switch_to_next_session()
     end, vim.tbl_extend("force", opts, {desc = "Next terminal session"}))
+    M.keymap_ids[bufnr]["next"] = next_key
   end
   
   if prev_key and not is_blacklisted(prev_key) then
     vim.keymap.set("t", prev_key, function()
       M.switch_to_previous_session()
     end, vim.tbl_extend("force", opts, {desc = "Previous terminal session"}))
+    M.keymap_ids[bufnr]["prev"] = prev_key
   end
 end
 
@@ -287,27 +368,24 @@ function M.setup_existing_terminal_keymaps()
   end
 end
 
--- Core functionality
-function M.toggle_manager()
-  M.stats.manager_toggles = M.stats.manager_toggles + 1
-  
-  -- Check if we're currently in a session window 
+-- Helper functions for toggle_manager
+local function is_current_window_session_terminal()
   local current_win = vim.api.nvim_get_current_win()
-  local is_in_session_window = false
   
-  if floating_window.is_floating_window(current_win) then
-    local current_buf = vim.api.nvim_win_get_buf(current_win)
-    local filetype = vim.api.nvim_buf_get_option(current_buf, "filetype")
-    if filetype == "terminal" or vim.api.nvim_buf_get_option(current_buf, "buftype") == "terminal" then
-      is_in_session_window = true
-      -- Close ALL session terminal windows, not just the current one
-      M.close_all_session_windows()
-    end
+  if not floating_window.is_floating_window(current_win) then
+    return false
   end
   
-  -- If we were in a session window, always open the manager
-  -- Otherwise, toggle based on current manager state
-  if is_in_session_window then
+  local current_buf = utils.safe_api_call(vim.api.nvim_win_get_buf, nil, current_win)
+  if not current_buf then
+    return false
+  end
+  
+  return utils.is_terminal_buffer(current_buf)
+end
+
+local function handle_toggle_logic(was_in_session_window)
+  if was_in_session_window then
     M.open_manager()
   elseif M.is_manager_open() then
     M.close_manager()
@@ -316,87 +394,109 @@ function M.toggle_manager()
   end
 end
 
+-- Core functionality
+function M.toggle_manager()
+  M.stats.manager_toggles = M.stats.manager_toggles + 1
+  
+  local is_in_session_window = is_current_window_session_terminal()
+  
+  if is_in_session_window then
+    M.close_all_session_windows()
+  end
+  
+  handle_toggle_logic(is_in_session_window)
+end
+
+-- Helper functions for open_manager
+local function calculate_manager_dimensions()
+  local total_width, total_height = utils.calculate_size_from_ratio(get_config("manager_width"), get_config("manager_height"))
+  local row, col = utils.calculate_centered_position(total_width, total_height)
+  return total_width, total_height, row, col
+end
+
+local function create_auto_hide_callback()
+  return function(winid, bufnr)
+    M.close_manager()
+  end
+end
+
+local function setup_split_layout(total_width, total_height, row, col)
+  local session_list = require("luxterm.ui.session_list")
+  local required_width = session_list.calculate_required_width() + 2
+  local left_width = math.min(required_width, math.floor(total_width * 0.6))
+  local left_width_ratio = left_width / total_width
+  
+  local base_config = {
+    width = total_width,
+    height = total_height,
+    row = row,
+    col = col,
+    border = "rounded"
+  }
+  
+  local left_config = {
+    title = " Sessions ",
+    width_ratio = left_width_ratio,
+    enter = true,
+    buffer_options = {filetype = "luxterm_main"},
+    auto_hide = get_config("auto_hide"),
+    auto_hide_callback = create_auto_hide_callback()
+  }
+  
+  local right_config = {
+    title = " Preview ",
+    enter = false,
+    buffer_options = {filetype = "luxterm_preview"},
+    auto_hide = get_config("auto_hide"),
+    auto_hide_callback = create_auto_hide_callback()
+  }
+  
+  local windows = floating_window.create_split_layout(base_config, left_config, right_config)
+  
+  M.manager_layout = {
+    type = "split",
+    windows = windows
+  }
+  
+  -- Initialize components
+  session_list.window_id = windows.left.winid
+  session_list.buffer_id = windows.left.bufnr
+  session_list.setup_keymaps()
+  
+  preview_pane.create_window(windows.right.winid, windows.right.bufnr)
+end
+
+local function setup_single_layout(total_width, total_height, row, col)
+  local winid, bufnr = session_list.create_window({
+    width = total_width,
+    height = total_height,
+    row = row,
+    col = col,
+    auto_hide = get_config("auto_hide"),
+    auto_hide_callback = create_auto_hide_callback()
+  })
+  
+  M.manager_layout = {
+    type = "single",
+    window_id = winid,
+    buffer_id = bufnr
+  }
+end
+
 function M.open_manager()
   if M.is_manager_open() then
     return true
   end
   
-  local total_width, total_height = utils.calculate_size_from_ratio(M.config.manager_width, M.config.manager_height)
-  local row, col = utils.calculate_centered_position(total_width, total_height)
+  local total_width, total_height, row, col = calculate_manager_dimensions()
   
-  if M.config.preview_enabled then
-    -- Calculate dynamic left panel width based on session list content
-    local session_list = require("luxterm.ui.session_list")
-    local required_width = session_list.calculate_required_width() + 2
-    local left_width = math.min(required_width, math.floor(total_width * 0.6)) -- Cap at 60% max
-    local left_width_ratio = left_width / total_width
-    
-    -- Create split layout
-    local base_config = {
-      width = total_width,
-      height = total_height,
-      row = row,
-      col = col,
-      border = "rounded"
-    }
-    
-    local left_config = {
-      title = " Sessions ",
-      width_ratio = left_width_ratio,
-      enter = true,
-      buffer_options = {filetype = "luxterm_main"},
-      auto_hide = M.config.auto_hide,
-      auto_hide_callback = function(winid, bufnr)
-        M.close_manager()
-      end
-    }
-    
-    local right_config = {
-      title = " Preview ",
-      enter = false,
-      buffer_options = {filetype = "luxterm_preview"},
-      auto_hide = M.config.auto_hide,
-      auto_hide_callback = function(winid, bufnr)
-        M.close_manager()
-      end
-    }
-    
-    local windows = floating_window.create_split_layout(base_config, left_config, right_config)
-    
-    M.manager_layout = {
-      type = "split",
-      windows = windows
-    }
-    
-    -- Initialize components
-    session_list.window_id = windows.left.winid
-    session_list.buffer_id = windows.left.bufnr
-    session_list.setup_keymaps()
-    
-    preview_pane.create_window(windows.right.winid, windows.right.bufnr)
+  if get_config("preview_enabled") then
+    setup_split_layout(total_width, total_height, row, col)
   else
-    -- Create single window layout
-    local winid, bufnr = session_list.create_window({
-      width = total_width,
-      height = total_height,
-      row = row,
-      col = col,
-      auto_hide = M.config.auto_hide,
-      auto_hide_callback = function(winid, bufnr)
-        M.close_manager()
-      end
-    })
-    
-    M.manager_layout = {
-      type = "single",
-      window_id = winid,
-      buffer_id = bufnr
-    }
+    setup_single_layout(total_width, total_height, row, col)
   end
   
   M.refresh_manager()
-  
-  -- Setup close handler
   M.setup_manager_close_handler()
   
   events.emit(events.MANAGER_OPENED)
@@ -410,37 +510,56 @@ function M.setup_manager_close_handler()
     local right_winid = M.manager_layout.windows.right.winid
     
     if left_winid then
-      vim.api.nvim_create_autocmd("WinClosed", {
+      local autocmd_id = vim.api.nvim_create_autocmd("WinClosed", {
         pattern = tostring(left_winid),
         callback = function()
+          M.cleanup_manager_autocmd(autocmd_id)
           M.close_manager()
         end,
         once = true
       })
+      M.autocmd_ids[autocmd_id] = true
     end
     
     if right_winid then
-      vim.api.nvim_create_autocmd("WinClosed", {
+      local autocmd_id = vim.api.nvim_create_autocmd("WinClosed", {
         pattern = tostring(right_winid),
         callback = function()
+          M.cleanup_manager_autocmd(autocmd_id)
           M.close_manager()
         end,
         once = true
       })
+      M.autocmd_ids[autocmd_id] = true
     end
   else
     -- Single window layout
     local winid_to_watch = M.manager_layout.window_id
     if winid_to_watch then
-      vim.api.nvim_create_autocmd("WinClosed", {
+      local autocmd_id = vim.api.nvim_create_autocmd("WinClosed", {
         pattern = tostring(winid_to_watch),
         callback = function()
+          M.cleanup_manager_autocmd(autocmd_id)
           M.close_manager()
         end,
         once = true
       })
+      M.autocmd_ids[autocmd_id] = true
     end
   end
+end
+
+function M.cleanup_manager_autocmd(autocmd_id)
+  if M.autocmd_ids[autocmd_id] then
+    M.autocmd_ids[autocmd_id] = nil
+  end
+end
+
+function M.cleanup_all_manager_autocmds()
+  for autocmd_id, _ in pairs(M.autocmd_ids) do
+    pcall(vim.api.nvim_del_autocmd, autocmd_id)
+  end
+  M.autocmd_ids = {}
 end
 
 function M.close_manager()
@@ -450,6 +569,9 @@ function M.close_manager()
   
   local layout = M.manager_layout
   M.manager_layout = nil  -- Set to nil first to prevent re-entry
+  
+  -- Clean up all manager autocmds
+  M.cleanup_all_manager_autocmds()
   
   if layout.type == "split" then
     if layout.windows and layout.windows.left then
@@ -476,20 +598,23 @@ function M.refresh_manager(preserve_selection_position)
     return
   end
   
+  -- Trigger periodic cleanup during refresh
+  session_manager.periodic_cleanup()
+  
   local sessions = session_manager.get_all_sessions()
   local active_session = session_manager.get_active_session()
   local active_id = active_session and active_session.id or nil
   
   session_list.update_sessions(sessions, active_id, preserve_selection_position)
   
-  if M.config.preview_enabled and preview_pane.is_visible() then
+  if get_config("preview_enabled") and preview_pane.is_visible() then
     local selected = session_list.get_selected_session()
     preview_pane.update_preview(selected)
   end
 end
 
 function M.update_preview_for_selection(session)
-  if M.config.preview_enabled and preview_pane.is_visible() then
+  if get_config("preview_enabled") and preview_pane.is_visible() then
     preview_pane.update_preview(session)
   end
 end
@@ -506,10 +631,10 @@ function M.create_session(opts)
   events.emit(events.SESSION_CREATED, {session = session})
   
   if M.is_manager_open() then
-    M.refresh_manager()
+    debounced_manager_refresh()
   end
   
-  if opts.focus_on_create or M.config.focus_on_create then
+  if opts.focus_on_create or get_config("focus_on_create") then
     M.open_session_window(session)
   end
   
@@ -533,11 +658,19 @@ function M.delete_session(session_id, opts)
     end
   end
   
+  local session = session_manager.get_session(session_id)
+  local bufnr = session and session.bufnr or nil
+  
   local success = session_manager.delete_session(session_id)
   if success then
+    -- Clean up keymaps for this session
+    if bufnr then
+      M.cleanup_session_keymaps(bufnr)
+    end
+    
     events.emit(events.SESSION_DELETED, {session_id = session_id})
     if M.is_manager_open() then
-      M.refresh_manager(true)  -- Preserve selection position after deletion
+      debounced_manager_refresh(true)
     end
   end
   
@@ -566,7 +699,7 @@ function M.delete_sessions_by_pattern(pattern)
     events.emit(events.SESSION_DELETED, {session_id = session.id})
   end
   if M.is_manager_open() then
-    M.refresh_manager(true)  -- Preserve selection position after deletion
+    debounced_manager_refresh(true)
   end
   return deleted
 end
@@ -576,7 +709,7 @@ function M.switch_session(session_id)
   if session then
     events.emit(events.SESSION_SWITCHED, {session = session})
     if M.is_manager_open() then
-      M.refresh_manager()
+      debounced_manager_refresh()
     end
   end
   return session
@@ -590,7 +723,7 @@ function M.switch_to_next_session()
   if session then
     events.emit(events.SESSION_SWITCHED, {session = session})
     if M.is_manager_open() then
-      M.refresh_manager()
+      debounced_manager_refresh()
     end
     M.open_session_window(session)
   end
@@ -605,7 +738,7 @@ function M.switch_to_previous_session()
   if session then
     events.emit(events.SESSION_SWITCHED, {session = session})
     if M.is_manager_open() then
-      M.refresh_manager()
+      debounced_manager_refresh()
     end
     M.open_session_window(session)
   end
@@ -640,7 +773,7 @@ function M.open_session_window(session)
   end
   
   floating_window.create_session_window(session, {
-    auto_hide = M.config.auto_hide
+    auto_hide = get_config("auto_hide")
   })
   
   -- Ensure terminal keymaps are set up for this session
@@ -668,7 +801,7 @@ function M.rename_selected_session()
       M.update_session_window_title(session)
       
       if M.is_manager_open() then
-        M.refresh_manager()
+        debounced_manager_refresh()
       end
     end
   end)
@@ -677,29 +810,17 @@ function M.rename_selected_session()
 end
 
 function M.close_all_session_windows()
-  -- Close all floating windows that contain session terminal buffers
-  local sessions = session_manager.get_all_sessions()
-  local closed_count = 0
+  local results = process_session_windows({
+    {
+      func = function(win, buf, session)
+        floating_window.close_window(win)
+        return 1
+      end,
+      collect_results = true
+    }
+  })
   
-  for _, win in ipairs(vim.api.nvim_list_wins()) do
-    if vim.api.nvim_win_is_valid(win) and floating_window.is_floating_window(win) then
-      local buf = vim.api.nvim_win_get_buf(win)
-      local filetype = vim.api.nvim_buf_get_option(buf, "filetype")
-      
-      -- Check if this is a terminal window with a session buffer
-      if filetype == "terminal" or vim.api.nvim_buf_get_option(buf, "buftype") == "terminal" then
-        for _, session in ipairs(sessions) do
-          if session.bufnr == buf then
-            floating_window.close_window(win)
-            closed_count = closed_count + 1
-            break
-          end
-        end
-      end
-    end
-  end
-  
-  return closed_count
+  return #results
 end
 
 function M.update_session_window_title(session)
@@ -707,22 +828,29 @@ function M.update_session_window_title(session)
     return false
   end
   
-  -- Find any floating windows that contain this session's buffer
-  for _, win in ipairs(vim.api.nvim_list_wins()) do
-    if vim.api.nvim_win_is_valid(win) and floating_window.is_floating_window(win) then
-      local buf = vim.api.nvim_win_get_buf(win)
-      if buf == session.bufnr then
-        -- Update the window title
-        vim.api.nvim_win_set_config(win, {
-          title = " " .. session.name .. " ",
-          title_pos = "center"
-        })
-        return true
-      end
-    end
-  end
+  -- Cache the window configuration to avoid redundant API calls
+  local new_title = " " .. session.name .. " "
+  local results = process_session_windows({
+    {
+      func = function(win, buf, found_session)
+        if buf == session.bufnr then
+          -- Only update if title actually changed
+          local current_config = vim.api.nvim_win_get_config(win)
+          if current_config.title ~= new_title then
+            vim.api.nvim_win_set_config(win, {
+              title = new_title,
+              title_pos = "center"
+            })
+          end
+          return true
+        end
+        return false
+      end,
+      early_exit = true
+    }
+  })
   
-  return false
+  return #results > 0
 end
 
 -- Utility functions
@@ -744,6 +872,7 @@ end
 function M.show_stats()
   local uptime = (vim.loop.now() - M.stats.uptime_start) / 1000
   local session_count = session_manager.get_session_count()
+  local memory_stats = events.get_memory_stats()
   
   local stats_lines = {
     "Luxterm Statistics:",
@@ -752,16 +881,52 @@ function M.show_stats()
     string.format("Sessions created: %d", M.stats.sessions_created),
     string.format("Sessions deleted: %d", M.stats.sessions_deleted),
     string.format("Manager toggles: %d", M.stats.manager_toggles),
-    string.format("Active sessions: %d", session_count)
+    string.format("Active sessions: %d", session_count),
+    "",
+    "Memory Statistics:",
+    string.format("Event handlers: %d", memory_stats.total_handlers),
+    string.format("Event types: %d", memory_stats.event_types),
+    string.format("Memory usage: %.2f MB", memory_stats.memory_usage / 1024 / 1024)
   }
   
   vim.notify(table.concat(stats_lines, "\n"), vim.log.levels.INFO)
+end
+
+function M.cleanup_session_keymaps(bufnr)
+  if M.keymap_ids[bufnr] then
+    for _, key in pairs(M.keymap_ids[bufnr]) do
+      pcall(vim.keymap.del, "t", key, {buffer = bufnr})
+    end
+    M.keymap_ids[bufnr] = nil
+  end
+end
+
+function M.cleanup_all_session_keymaps()
+  for bufnr, _ in pairs(M.keymap_ids) do
+    M.cleanup_session_keymaps(bufnr)
+  end
 end
 
 function M.cleanup()
   if not M.initialized then
     return
   end
+  
+  if M.refresh_timer then
+    M.refresh_timer:stop()
+    M.refresh_timer:close()
+    M.refresh_timer = nil
+  end
+  
+  if M.manager_refresh_timer then
+    M.manager_refresh_timer:stop()
+    M.manager_refresh_timer:close()
+    M.manager_refresh_timer = nil
+  end
+  
+  -- Clean up all autocmds and keymaps
+  M.cleanup_all_manager_autocmds()
+  M.cleanup_all_session_keymaps()
   
   M.close_manager()
   events.clear_all()
@@ -778,7 +943,7 @@ function M.get_api()
     get_sessions = function() return session_manager.get_all_sessions() end,
     get_active_session = function() return session_manager.get_active_session() end,
     get_stats = function() return M.stats end,
-    get_config = function() return M.config end,
+    get_config = function() return config.get() end,
     is_manager_open = function() return M.is_manager_open() end
   }
 end

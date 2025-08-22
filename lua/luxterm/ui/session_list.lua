@@ -9,7 +9,18 @@ local M = {
   buffer_id = nil,
   sessions_data = {},
   active_session_id = nil,
-  selected_session_index = 1
+  selected_session_index = 1,
+  cached_width = nil,
+  cached_session_count = 0,
+  cached_content = nil,
+  cached_highlights = nil,
+  content_cache_key = nil,
+  keymap_handlers = {},
+  namespace_id = nil,
+  last_cursor_pos = nil,
+  pending_buffer_update = false,
+  max_cache_entries = 10,
+  cache_cleanup_threshold = 20
 }
 
 
@@ -18,6 +29,11 @@ function M.setup(opts)
 end
 
 function M.calculate_required_width()
+  local session_count = #M.sessions_data
+  if M.cached_width and M.cached_session_count == session_count then
+    return M.cached_width
+  end
+  
   -- Calculate width based on shortcuts content with 2 chars padding after "[Esc]"
   local shortcuts = {
     {icon = "󰷈", label = "New session", key = "[n]"},
@@ -27,7 +43,7 @@ function M.calculate_required_width()
   }
   
   -- If no sessions, use minimal shortcuts
-  if #M.sessions_data == 0 then
+  if session_count == 0 then
     shortcuts = {
       {icon = "󰷈", label = "New session", key = "[n]"},
       {icon = "󰅖", label = "Close", key = "[Esc]"}
@@ -44,7 +60,12 @@ function M.calculate_required_width()
   end
   
   -- Add some minimum width and ensure it's reasonable
-  return math.max(max_width, 30)
+  local calculated_width = math.max(max_width, 30)
+  
+  M.cached_width = calculated_width
+  M.cached_session_count = session_count
+  
+  return calculated_width
 end
 
 
@@ -79,17 +100,55 @@ function M.create_window(config)
   return M.window_id, M.buffer_id
 end
 
+function M.cleanup_keymaps()
+  if M.buffer_id then
+    for keymap_spec, _ in pairs(M.keymap_handlers) do
+      local mode, key = keymap_spec:match("(%w+):(.+)")
+      if mode and key then
+        pcall(vim.keymap.del, mode, key, {buffer = M.buffer_id})
+      end
+    end
+    M.keymap_handlers = {}
+  end
+end
+
+function M.cleanup_all_caches()
+  -- Clear all cached data to free memory
+  M.cached_content = nil
+  M.cached_highlights = nil
+  M.content_cache_key = nil
+  M.cached_width = nil
+  M.cached_session_count = 0
+  M.sessions_data = {}
+  M.last_cursor_pos = nil
+  
+  -- Force garbage collection
+  collectgarbage("collect")
+end
+
 function M.destroy()
+  M.cleanup_keymaps()
+  M.cleanup_all_caches()
+  
   if utils.is_valid_window(M.window_id) then
     vim.api.nvim_win_close(M.window_id, true)
   end
   M.window_id = nil
   M.buffer_id = nil
+  M.namespace_id = nil
+  M.pending_buffer_update = false
 end
 
 function M.update_sessions(sessions, active_session_id, preserve_selection_position)
   M.sessions_data = sessions or {}
   M.active_session_id = active_session_id
+  
+  if #M.sessions_data ~= M.cached_session_count then
+    M.cached_width = nil
+    M.cached_content = nil
+    M.cached_highlights = nil 
+    M.content_cache_key = nil
+  end
   
   -- Ensure valid selection
   if #M.sessions_data > 0 then
@@ -110,23 +169,26 @@ function M.update_sessions(sessions, active_session_id, preserve_selection_posit
   M.render()
 end
 
-function M.render()
-  if not utils.is_valid_window(M.window_id) then
-    return
+function M.preserve_cursor_position()
+  if utils.is_valid_window(M.window_id) then
+    M.last_cursor_pos = vim.api.nvim_win_get_cursor(M.window_id)
   end
-  
-  local lines, highlights = M.generate_content()
-  
-  -- Update protected buffer content using shared utility
-  buffer_protection.update_protected_buffer_content(M.buffer_id, lines)
-  
-  -- Apply highlights using extmarks with priority for better control
+end
+
+function M.restore_cursor_position()
+  if M.last_cursor_pos and utils.is_valid_window(M.window_id) then
+    pcall(vim.api.nvim_win_set_cursor, M.window_id, M.last_cursor_pos)
+  end
+end
+
+function M.apply_highlights_batch(highlights)
   local ns_id = vim.api.nvim_create_namespace("luxterm_session_list")
   vim.api.nvim_buf_clear_namespace(M.buffer_id, ns_id, 0, -1)
   
+  -- Use the original highlighting approach that was working
   for _, hl in ipairs(highlights) do
     if hl.priority then
-      -- Use extmark for priority control
+      -- Use extmark for priority control (this was working before)
       vim.api.nvim_buf_set_extmark(M.buffer_id, ns_id, hl.line, hl.col_start, {
         end_col = hl.col_end == -1 and nil or hl.col_end,
         end_line = hl.line,
@@ -134,13 +196,91 @@ function M.render()
         priority = hl.priority
       })
     else
-      -- Use regular highlight for non-priority items
+      -- Use regular highlight for non-priority items (this was working before)
       vim.api.nvim_buf_add_highlight(M.buffer_id, ns_id, hl.group, hl.line, hl.col_start, hl.col_end)
     end
   end
 end
 
+function M.update_buffer_differential(lines)
+  if not M.buffer_id or M.pending_buffer_update then
+    return
+  end
+  
+  M.pending_buffer_update = true
+  
+  -- Get current buffer lines
+  local current_lines = vim.api.nvim_buf_get_lines(M.buffer_id, 0, -1, false)
+  
+  -- Only update if content actually changed
+  local content_changed = false
+  if #current_lines ~= #lines then
+    content_changed = true
+  else
+    for i, line in ipairs(lines) do
+      if current_lines[i] ~= line then
+        content_changed = true
+        break
+      end
+    end
+  end
+  
+  if content_changed then
+    M.preserve_cursor_position()
+    buffer_protection.update_protected_buffer_content(M.buffer_id, lines)
+    vim.schedule(function()
+      M.restore_cursor_position()
+      M.pending_buffer_update = false
+    end)
+  else
+    M.pending_buffer_update = false
+  end
+end
+
+function M.render()
+  if not utils.is_valid_window(M.window_id) then
+    return
+  end
+  
+  local lines, highlights = M.generate_content()
+  
+  -- Use differential buffer updates
+  M.update_buffer_differential(lines)
+  
+  -- Apply highlights in batch
+  M.apply_highlights_batch(highlights)
+end
+
+local function generate_cache_key()
+  local session_ids = {}
+  for i, session in ipairs(M.sessions_data) do
+    table.insert(session_ids, session.id .. ":" .. session.name .. ":" .. session:get_status())
+  end
+  return table.concat(session_ids, "|") .. "|" .. (M.active_session_id or "") .. "|" .. M.selected_session_index
+end
+
+function M.cleanup_cache_if_needed()
+  -- If we have too many cached entries, clear cache to prevent memory bloat
+  if #M.sessions_data > M.cache_cleanup_threshold then
+    M.cached_content = nil
+    M.cached_highlights = nil
+    M.content_cache_key = nil
+    M.cached_width = nil
+    
+    -- Force garbage collection
+    collectgarbage("collect")
+  end
+end
+
 function M.generate_content()
+  local cache_key = generate_cache_key()
+  if M.cached_content and M.cached_highlights and M.content_cache_key == cache_key then
+    return M.cached_content, M.cached_highlights
+  end
+  
+  -- Check if we need to cleanup cache
+  M.cleanup_cache_if_needed()
+  
   local lines = {}
   local highlights = {}
   
@@ -156,6 +296,13 @@ function M.generate_content()
   table.insert(lines, "")
   table.insert(lines, "")
    M.add_shortcuts_content(lines, highlights)
+  
+  -- Only cache if we're within reasonable limits
+  if #M.sessions_data <= M.max_cache_entries then
+    M.cached_content = lines
+    M.cached_highlights = highlights
+    M.content_cache_key = cache_key
+  end
   
   return lines, highlights
 end
@@ -395,27 +542,37 @@ function M.setup_keymaps()
   
   local opts = {noremap = true, silent = true, buffer = M.buffer_id}
   
-  -- Session actions
-  vim.keymap.set("n", "n", function() M.emit_action("new_session") end, opts)
-  vim.keymap.set("n", "d", function() M.emit_action("delete_session") end, opts)
-  vim.keymap.set("n", "r", function() M.emit_action("rename_session") end, opts)
-  vim.keymap.set("n", "<Esc>", function() M.emit_action("close_manager") end, opts)
-  vim.keymap.set("n", "<CR>", function() M.emit_action("open_session") end, opts)
+  -- Batch all keymap setups to reduce API calls
+  local keymaps = {
+    -- Session actions
+    {"n", "n", function() M.emit_action("new_session") end},
+    {"n", "d", function() M.emit_action("delete_session") end},
+    {"n", "r", function() M.emit_action("rename_session") end},
+    {"n", "<Esc>", function() M.emit_action("close_manager") end},
+    {"n", "<CR>", function() M.emit_action("open_session") end},
+    -- Navigation
+    {"n", "j", function() M.navigate("down") end},
+    {"n", "k", function() M.navigate("up") end},
+    {"n", "<Down>", function() M.navigate("down") end},
+    {"n", "<Up>", function() M.navigate("up") end}
+  }
   
-  -- Navigation
-  vim.keymap.set("n", "j", function() M.navigate("down") end, opts)
-  vim.keymap.set("n", "k", function() M.navigate("up") end, opts)
-  vim.keymap.set("n", "<Down>", function() M.navigate("down") end, opts)
-  vim.keymap.set("n", "<Up>", function() M.navigate("up") end, opts)
-  
-  -- Number keys for direct selection by session number
+  -- Add number keys for direct selection
   for i = 1, 9 do
-    vim.keymap.set("n", tostring(i), function() 
+    table.insert(keymaps, {"n", tostring(i), function() 
       local session, index = M.get_session_by_number(i)
       if session then
         M.emit_action("select_session", {index = index}) 
       end
-    end, opts)
+    end})
+  end
+  
+  -- Apply all keymaps in batch
+  for _, keymap in ipairs(keymaps) do
+    vim.keymap.set(keymap[1], keymap[2], keymap[3], opts)
+    -- Track keymaps for cleanup
+    local keymap_spec = keymap[1] .. ":" .. keymap[2]
+    M.keymap_handlers[keymap_spec] = true
   end
 end
 
