@@ -6,7 +6,9 @@ local utils = require("luxterm.utils")
 local M = {
   window_id = nil,
   buffer_id = nil,
-  current_session = nil
+  current_session = nil,
+  namespace_id = nil,
+  last_content_hash = nil
 }
 
 function M.setup(opts)
@@ -29,6 +31,26 @@ function M.create_window(winid, bufnr)
 end
 
 
+function M.generate_content_hash(session)
+  if not session then
+    return "empty"
+  end
+  
+  local content_preview = session:get_content_preview()
+  local content_string = table.concat(content_preview, "\n")
+  return session.id .. ":" .. session.name .. ":" .. session:get_status() .. ":" .. content_string
+end
+
+function M.apply_highlights_optimized(highlights)
+  local ns_id = vim.api.nvim_create_namespace("luxterm_preview")
+  vim.api.nvim_buf_clear_namespace(M.buffer_id, ns_id, 0, -1)
+  
+  -- Use the original highlighting approach that was working
+  for _, hl in ipairs(highlights) do
+    vim.api.nvim_buf_add_highlight(M.buffer_id, ns_id, hl.group, hl.line, hl.col_start, hl.col_end)
+  end
+end
+
 function M.update_preview(session)
   if not utils.is_valid_window(M.window_id) then
     return
@@ -38,7 +60,14 @@ function M.update_preview(session)
     return
   end
   
+  -- Check if content actually changed to avoid unnecessary updates
+  local content_hash = M.generate_content_hash(session)
+  if M.last_content_hash == content_hash then
+    return
+  end
+  
   M.current_session = session
+  M.last_content_hash = content_hash
   
   local lines = {}
   local highlights = {}
@@ -112,13 +141,8 @@ function M.update_preview(session)
   -- Update buffer content using shared utility
   buffer_protection.update_protected_buffer_content(M.buffer_id, lines)
   
-  -- Apply highlights
-  local ns_id = vim.api.nvim_create_namespace("luxterm_preview")
-  vim.api.nvim_buf_clear_namespace(M.buffer_id, ns_id, 0, -1)
-  
-  for _, hl in ipairs(highlights) do
-    vim.api.nvim_buf_add_highlight(M.buffer_id, ns_id, hl.group, hl.line, hl.col_start, hl.col_end)
-  end
+  -- Apply highlights optimized
+  M.apply_highlights_optimized(highlights)
 end
 
 function M.clear_preview()
@@ -129,6 +153,8 @@ function M.destroy()
   M.window_id = nil
   M.buffer_id = nil
   M.current_session = nil
+  M.namespace_id = nil
+  M.last_content_hash = nil
 end
 
 function M.is_visible()

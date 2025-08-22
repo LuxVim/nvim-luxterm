@@ -15,7 +15,10 @@ local M = {
   cached_content = nil,
   cached_highlights = nil,
   content_cache_key = nil,
-  keymap_handlers = {}
+  keymap_handlers = {},
+  namespace_id = nil,
+  last_cursor_pos = nil,
+  pending_buffer_update = false
 }
 
 
@@ -147,23 +150,26 @@ function M.update_sessions(sessions, active_session_id, preserve_selection_posit
   M.render()
 end
 
-function M.render()
-  if not utils.is_valid_window(M.window_id) then
-    return
+function M.preserve_cursor_position()
+  if utils.is_valid_window(M.window_id) then
+    M.last_cursor_pos = vim.api.nvim_win_get_cursor(M.window_id)
   end
-  
-  local lines, highlights = M.generate_content()
-  
-  -- Update protected buffer content using shared utility
-  buffer_protection.update_protected_buffer_content(M.buffer_id, lines)
-  
-  -- Apply highlights using extmarks with priority for better control
+end
+
+function M.restore_cursor_position()
+  if M.last_cursor_pos and utils.is_valid_window(M.window_id) then
+    pcall(vim.api.nvim_win_set_cursor, M.window_id, M.last_cursor_pos)
+  end
+end
+
+function M.apply_highlights_batch(highlights)
   local ns_id = vim.api.nvim_create_namespace("luxterm_session_list")
   vim.api.nvim_buf_clear_namespace(M.buffer_id, ns_id, 0, -1)
   
+  -- Use the original highlighting approach that was working
   for _, hl in ipairs(highlights) do
     if hl.priority then
-      -- Use extmark for priority control
+      -- Use extmark for priority control (this was working before)
       vim.api.nvim_buf_set_extmark(M.buffer_id, ns_id, hl.line, hl.col_start, {
         end_col = hl.col_end == -1 and nil or hl.col_end,
         end_line = hl.line,
@@ -171,10 +177,59 @@ function M.render()
         priority = hl.priority
       })
     else
-      -- Use regular highlight for non-priority items
+      -- Use regular highlight for non-priority items (this was working before)
       vim.api.nvim_buf_add_highlight(M.buffer_id, ns_id, hl.group, hl.line, hl.col_start, hl.col_end)
     end
   end
+end
+
+function M.update_buffer_differential(lines)
+  if not M.buffer_id or M.pending_buffer_update then
+    return
+  end
+  
+  M.pending_buffer_update = true
+  
+  -- Get current buffer lines
+  local current_lines = vim.api.nvim_buf_get_lines(M.buffer_id, 0, -1, false)
+  
+  -- Only update if content actually changed
+  local content_changed = false
+  if #current_lines ~= #lines then
+    content_changed = true
+  else
+    for i, line in ipairs(lines) do
+      if current_lines[i] ~= line then
+        content_changed = true
+        break
+      end
+    end
+  end
+  
+  if content_changed then
+    M.preserve_cursor_position()
+    buffer_protection.update_protected_buffer_content(M.buffer_id, lines)
+    vim.schedule(function()
+      M.restore_cursor_position()
+      M.pending_buffer_update = false
+    end)
+  else
+    M.pending_buffer_update = false
+  end
+end
+
+function M.render()
+  if not utils.is_valid_window(M.window_id) then
+    return
+  end
+  
+  local lines, highlights = M.generate_content()
+  
+  -- Use differential buffer updates
+  M.update_buffer_differential(lines)
+  
+  -- Apply highlights in batch
+  M.apply_highlights_batch(highlights)
 end
 
 local function generate_cache_key()

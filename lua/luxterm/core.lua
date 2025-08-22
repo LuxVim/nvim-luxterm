@@ -778,14 +778,20 @@ function M.update_session_window_title(session)
     return false
   end
   
+  -- Cache the window configuration to avoid redundant API calls
+  local new_title = " " .. session.name .. " "
   local results = process_session_windows({
     {
       func = function(win, buf, found_session)
         if buf == session.bufnr then
-          vim.api.nvim_win_set_config(win, {
-            title = " " .. session.name .. " ",
-            title_pos = "center"
-          })
+          -- Only update if title actually changed
+          local current_config = vim.api.nvim_win_get_config(win)
+          if current_config.title ~= new_title then
+            vim.api.nvim_win_set_config(win, {
+              title = new_title,
+              title_pos = "center"
+            })
+          end
           return true
         end
         return false
