@@ -29,43 +29,17 @@ function M.setup(opts)
 end
 
 function M.calculate_required_width()
-  local session_count = #M.sessions_data
-  if M.cached_width and M.cached_session_count == session_count then
-    return M.cached_width
+  local min_width = 42
+
+  local max_name_length = 0
+  for _, session in ipairs(M.sessions_data) do
+    local display_name = M.get_display_name(session)
+    max_name_length = math.max(max_name_length, #display_name)
   end
-  
-  -- Calculate width based on shortcuts content with 2 chars padding after "[Esc]"
-  local shortcuts = {
-    {icon = "󰷈", label = "New session", key = "[n]"},
-    {icon = "󰆴", label = "Delete session", key = "[d]"},
-    {icon = "󰑕", label = "Rename session", key = "[r]"},
-    {icon = "󰅖", label = "Close", key = "[Esc]"}
-  }
-  
-  -- If no sessions, use minimal shortcuts
-  if session_count == 0 then
-    shortcuts = {
-      {icon = "󰷈", label = "New session", key = "[n]"},
-      {icon = "󰅖", label = "Close", key = "[Esc]"}
-    }
-  end
-  
-  local max_width = 0
-  for _, item in ipairs(shortcuts) do
-    local content = "  " .. item.icon .. "  " .. item.label
-    local content_width = vim.fn.strdisplaywidth(content)
-    local key_width = vim.fn.strdisplaywidth(item.key)
-    local total_width = content_width + key_width + 2  -- 2 chars padding after key
-    max_width = math.max(max_width, total_width)
-  end
-  
-  -- Add some minimum width and ensure it's reasonable
-  local calculated_width = math.max(max_width, 30)
-  
-  M.cached_width = calculated_width
-  M.cached_session_count = session_count
-  
-  return calculated_width
+
+  local content_width = 2 + 2 + math.min(max_name_length, 15) + 2 + 4 + 2 + 3 + 2
+
+  return math.max(min_width, content_width)
 end
 
 
@@ -277,185 +251,105 @@ function M.generate_content()
   if M.cached_content and M.cached_highlights and M.content_cache_key == cache_key then
     return M.cached_content, M.cached_highlights
   end
-  
-  -- Check if we need to cleanup cache
+
   M.cleanup_cache_if_needed()
-  
+
   local lines = {}
   local highlights = {}
-  
+  local cfg = require("luxterm.config").get()
+
   if #M.sessions_data == 0 then
+    table.insert(lines, "")
     table.insert(lines, "  No sessions")
     table.insert(lines, "")
+    table.insert(highlights, {
+      line = 1,
+      col_start = 0,
+      col_end = -1,
+      group = "LuxtermPreviewEmpty"
+    })
   else
+    table.insert(lines, "")
     for i, session in ipairs(M.sessions_data) do
-      M.add_session_content(lines, highlights, session, i)
+      M.add_session_content(lines, highlights, session, i, cfg)
     end
   end
-  
+
   table.insert(lines, "")
-  table.insert(lines, "")
-   M.add_shortcuts_content(lines, highlights)
-  
-  -- Only cache if we're within reasonable limits
+  M.add_shortcuts_content(lines, highlights)
+
   if #M.sessions_data <= M.max_cache_entries then
     M.cached_content = lines
     M.cached_highlights = highlights
     M.content_cache_key = cache_key
   end
-  
+
   return lines, highlights
 end
 
-function M.add_session_content(lines, highlights, session, index)
+function M.add_session_content(lines, highlights, session, index, config)
   local is_selected = index == M.selected_session_index
-  local is_active = session.id == M.active_session_id
-  
-  -- Get session info
-  local status_icon = M.get_status_icon(session)
-  local name = M.truncate_name(session.name, 12)  -- Names are already limited to 12 chars
-  local status_text = session:get_status()
-  
-  -- Use list position for hotkey (consistent with keymap behavior)
-  local hotkey = string.format("[%d]", index)
-  
-  
-  -- Create bordered box
-  local status_display = status_icon .. " " .. status_text
-  local hotkey_display = "Press " .. hotkey .. " to open"
-  
-  local max_width = math.max(
-    vim.fn.strdisplaywidth(name),
-    vim.fn.strdisplaywidth(status_display),
-    vim.fn.strdisplaywidth(hotkey_display)
-  )
-  
-  -- Choose border style based on selection
-  local border_hl = is_selected and "LuxtermBorderSelected" or "LuxtermBorderNormal"
-  
-  -- Build bordered content
   local line_num = #lines
-  local top_border = "  ╭ " .. name .. " " .. string.rep("─", max_width - vim.fn.strdisplaywidth(name)) .. "╮"
-  local status_line = "  │ " .. status_display .. string.rep(" ", max_width - vim.fn.strdisplaywidth(status_display)) .. " │"
-  local hotkey_line = "  │ " .. hotkey_display .. string.rep(" ", max_width - vim.fn.strdisplaywidth(hotkey_display)) .. " │"
-  local bottom_border = "  ╰" .. string.rep("─", max_width + 2) .. "╯"
-  
-  -- Add lines
-  table.insert(lines, top_border)
-  table.insert(lines, status_line)
-  table.insert(lines, hotkey_line)
-  table.insert(lines, bottom_border)
-  table.insert(lines, "")
-  
-  -- Calculate byte positions for highlighting
-  -- "  ╭ " = 2 spaces + ╭ (3 bytes) + 1 space = 6 bytes total
-  local prefix = "  ╭ "
-  local prefix_bytes = string.len(prefix)  -- This gives us the byte count
-  local name_bytes = string.len(name)
-  
-  -- Highlight session name with HIGH priority to ensure it takes precedence
-  local name_hl_group = is_selected and "LuxtermSessionNameSelected" or "LuxtermSessionName"
-  table.insert(highlights, {
-    line = line_num,
-    col_start = prefix_bytes,  -- Start after the prefix
-    col_end = prefix_bytes + name_bytes,  -- End after the name
-    group = name_hl_group,
-    priority = 100  -- High priority to override border highlights
-  })
-  
-  -- Add border highlights (only the actual border characters, not the content)
-  -- Top border: highlight the box drawing characters and padding
-  table.insert(highlights, {
-    line = line_num,
-    col_start = 0,
-    col_end = prefix_bytes,  -- Just the prefix part
-    group = border_hl
-  })
-  -- Highlight the border after the name (space + border chars)
-  table.insert(highlights, {
-    line = line_num,
-    col_start = prefix_bytes + name_bytes + 1,  -- After prefix + name + space
-    col_end = -1,  -- Rest of the border
-    group = border_hl
-  })
-  
-  -- Middle lines: highlight the border characters only
-  local side_prefix = "  │ "  -- 2 spaces + │ (3 bytes) + 1 space = 6 bytes
-  local side_prefix_bytes = string.len(side_prefix)
-  local side_suffix = " │"  -- 1 space + │ (3 bytes) = 4 bytes
-  local side_suffix_bytes = string.len(side_suffix)
-  
-  for i = 1, 2 do
-    local current_line_idx = line_num + i + 1  -- lines array index for the current line being highlighted
-    table.insert(highlights, {
-      line = line_num + i,
-      col_start = 0,
-      col_end = side_prefix_bytes,  -- Just the "  │ " part
-      group = border_hl
-    })
-    table.insert(highlights, {
-      line = line_num + i,
-      col_start = string.len(lines[current_line_idx]) - side_suffix_bytes,  -- Just the ending " │"
-      col_end = -1,
-      group = border_hl
-    })
+
+  local icon, icon_hl = M.get_status_icon_and_highlight(session, config)
+  local display_name = M.get_display_name(session)
+  local time_since = session:get_time_since_active()
+  local hotkey = string.format("[%d]", index)
+
+  if #display_name > 15 then
+    display_name = display_name:sub(1, 12) .. "..."
   end
-  
-  -- Bottom border: highlight entire line
+
+  local line = string.format("  %s %-15s %4s  %s", icon, display_name, time_since, hotkey)
+  table.insert(lines, line)
+
+  local icon_start = 2
+  local icon_end = icon_start + #icon
   table.insert(highlights, {
-    line = line_num + 3,
-    col_start = 0,
+    line = line_num,
+    col_start = icon_start,
+    col_end = icon_end,
+    group = icon_hl
+  })
+
+  local name_col = 5
+  local name_hl = is_selected and "LuxtermSelected" or "LuxtermSessionName"
+  local fade_timeout = config.ui and config.ui.fade_timeout or 1800
+  local diff_seconds = (vim.loop.now() - session.last_accessed) / 1000
+  if diff_seconds > fade_timeout then
+    name_hl = "LuxtermDimmed"
+  end
+
+  table.insert(highlights, {
+    line = line_num,
+    col_start = name_col,
+    col_end = name_col + #display_name,
+    group = name_hl
+  })
+
+  local time_col = 22
+  table.insert(highlights, {
+    line = line_num,
+    col_start = time_col,
+    col_end = time_col + #time_since,
+    group = "LuxtermTime"
+  })
+
+  local hotkey_col = 28
+  table.insert(highlights, {
+    line = line_num,
+    col_start = hotkey_col,
     col_end = -1,
-    group = border_hl
+    group = "LuxtermHotkey"
   })
-  
-  -- Highlight status icon (orange when selected, default otherwise)
-  local icon_hl_group = is_selected and "LuxtermSessionIconSelected" or "LuxtermSessionIcon"
-  local status_icon_bytes = string.len(status_icon)
-  table.insert(highlights, {
-    line = line_num + 1,
-    col_start = side_prefix_bytes,
-    col_end = side_prefix_bytes + status_icon_bytes,
-    group = icon_hl_group
-  })
-  
-  -- Highlight status text (orange when selected, gray otherwise)
-  local status_text_hl = is_selected and "LuxtermSessionSelected" or "LuxtermSessionNormal"
-  table.insert(highlights, {
-    line = line_num + 1,
-    col_start = side_prefix_bytes + status_icon_bytes + 1,  -- After icon + space
-    col_end = string.len(lines[line_num + 2]) - side_suffix_bytes,  -- Up to the border
-    group = status_text_hl
-  })
-  
-  -- Highlight hotkey line text (orange when selected, gray otherwise)
-  local hotkey_text_hl = is_selected and "LuxtermSessionSelected" or "LuxtermSessionNormal"
-  local key_pattern = "%[%d+%]"
-  local key_start_pos = string.find(hotkey_line, key_pattern)
-  if key_start_pos then
-    -- Highlight "Press " part (accounting for the prefix)
+
+  if is_selected then
     table.insert(highlights, {
-      line = line_num + 2,
-      col_start = side_prefix_bytes,
-      col_end = key_start_pos - 1,  -- Up to the key
-      group = hotkey_text_hl
-    })
-    
-    -- Highlight the key itself (always purple)
-    local _, key_end = string.find(hotkey_line, key_pattern)
-    table.insert(highlights, {
-      line = line_num + 2,
-      col_start = key_start_pos - 1,
-      col_end = key_end,
-      group = "LuxtermSessionKey"
-    })
-    
-    -- Highlight " to open" part
-    table.insert(highlights, {
-      line = line_num + 2,
-      col_start = key_end,
-      col_end = string.len(lines[line_num + 3]) - side_suffix_bytes,  -- Up to the border
-      group = hotkey_text_hl
+      line = line_num,
+      col_start = 0,
+      col_end = -1,
+      group = "LuxtermSelected",
+      priority = 50
     })
   end
 end
