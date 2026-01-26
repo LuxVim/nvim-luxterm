@@ -477,6 +477,7 @@ function M.setup_keymaps()
     {"n", "n", function() M.emit_action("new_session") end},
     {"n", "d", function() M.emit_action("delete_session") end},
     {"n", "r", function() M.emit_action("rename_session") end},
+    {"n", "p", function() M.emit_action("toggle_preview") end},
     {"n", "<Esc>", function() M.emit_action("close_manager") end},
     {"n", "<CR>", function() M.emit_action("open_session") end},
     -- Navigation

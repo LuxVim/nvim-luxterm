@@ -184,7 +184,11 @@ function M.setup_event_handlers()
   session_list.on_action("selection_changed", function(payload)
     M.update_preview_for_selection(payload.session)
   end)
-  
+
+  session_list.on_action("toggle_preview", function()
+    M.toggle_preview()
+  end)
+
   -- Event tracking
   events.on(events.SESSION_CREATED, function()
     M.stats.sessions_created = M.stats.sessions_created + 1
@@ -625,6 +629,18 @@ function M.update_preview_for_selection(session)
   if get_config("preview_enabled") and preview_pane.is_visible() then
     preview_pane.update_preview(session)
   end
+end
+
+function M.toggle_preview()
+  if not M.is_manager_open() then
+    return
+  end
+
+  local new_preview_state = not get_config("preview_enabled")
+  config.update("preview_enabled", new_preview_state)
+
+  M.close_manager()
+  M.open_manager()
 end
 
 -- Session management operations
