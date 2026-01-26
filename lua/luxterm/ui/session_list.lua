@@ -530,6 +530,49 @@ function M.get_status_icon(session)
   end
 end
 
+function M.get_status_icon_and_highlight(session, config)
+  local process, process_status = session:get_process()
+  local stale_timeout = config.ui and config.ui.stale_timeout or 300
+  local fade_timeout = config.ui and config.ui.fade_timeout or 1800
+
+  local diff_seconds = (vim.loop.now() - session.last_accessed) / 1000
+
+  if session:get_status() == "stopped" then
+    return "○", "LuxtermStatusStopped"
+  elseif process_status == "running" then
+    if diff_seconds > stale_timeout then
+      return "◐", "LuxtermStatusStale"
+    else
+      return "●", "LuxtermStatusActive"
+    end
+  else
+    if diff_seconds > fade_timeout then
+      return "○", "LuxtermDimmed"
+    elseif diff_seconds > stale_timeout then
+      return "◐", "LuxtermStatusStale"
+    else
+      return "●", "LuxtermStatusActive"
+    end
+  end
+end
+
+function M.get_display_name(session)
+  local process, _ = session:get_process()
+  if process then
+    return process
+  end
+
+  local cwd = session:get_cwd()
+  if cwd then
+    local basename = vim.fn.fnamemodify(cwd, ":t")
+    if basename and basename ~= "" then
+      return basename
+    end
+  end
+
+  return session.name
+end
+
 function M.truncate_name(name, max_length)
   if vim.fn.strdisplaywidth(name) <= max_length then
     return name
