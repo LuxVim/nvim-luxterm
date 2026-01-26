@@ -11,6 +11,18 @@ local M = {
   last_content_hash = nil
 }
 
+local function shorten_path(path)
+  if not path then return "unknown" end
+  local home = vim.fn.expand("~")
+  if path:sub(1, #home) == home then
+    path = "~" .. path:sub(#home + 1)
+  end
+  if #path > 40 then
+    path = "..." .. path:sub(-37)
+  end
+  return path
+end
+
 function M.setup(opts)
   highlights.setup_preview_highlights()
 end
@@ -55,23 +67,22 @@ function M.update_preview(session)
   if not utils.is_valid_window(M.window_id) then
     return
   end
-  
+
   if not utils.is_valid_buffer(M.buffer_id) then
     return
   end
-  
-  -- Check if content actually changed to avoid unnecessary updates
+
   local content_hash = M.generate_content_hash(session)
   if M.last_content_hash == content_hash then
     return
   end
-  
+
   M.current_session = session
   M.last_content_hash = content_hash
-  
+
   local lines = {}
   local highlights = {}
-  
+
   if not session then
     table.insert(lines, "")
     table.insert(lines, "  Select a session to preview")
@@ -82,50 +93,76 @@ function M.update_preview(session)
       group = "LuxtermPreviewEmpty"
     })
   else
-    -- Session info header
-    table.insert(lines, "  Session: " .. session.name)
-    table.insert(lines, "  Status: " .. session:get_status())
     table.insert(lines, "")
-    
-    -- Highlight header
+
+    local cwd = shorten_path(session:get_cwd())
+    table.insert(lines, "  " .. cwd)
     table.insert(highlights, {
-      line = 0,
+      line = #lines - 1,
       col_start = 0,
       col_end = -1,
-      group = "LuxtermPreviewTitle"
+      group = "LuxtermDirectory"
     })
+
+    local process, status = session:get_process()
+    local last_cmd = session:get_last_command()
+    local process_line
+    if process then
+      if last_cmd then
+        process_line = process .. " (" .. last_cmd:sub(1, 30) .. ")"
+      else
+        process_line = process
+      end
+    else
+      process_line = status
+    end
+    table.insert(lines, "  " .. process_line)
     table.insert(highlights, {
-      line = 1,
+      line = #lines - 1,
       col_start = 0,
       col_end = -1,
-      group = "LuxtermPreviewTitle"
+      group = "LuxtermProcess"
     })
-    
-    -- Get content preview
-    local content_lines = session:get_content_preview()
-    
-    if #content_lines > 0 then
-      table.insert(lines, "  Recent output:")
-      table.insert(lines, "")
-      
+
+    if last_cmd then
+      table.insert(lines, "  $ " .. last_cmd:sub(1, 40))
       table.insert(highlights, {
-        line = #lines - 2,
+        line = #lines - 1,
         col_start = 0,
         col_end = -1,
-        group = "LuxtermPreviewTitle"
+        group = "LuxtermCommand"
       })
-      
-      -- Add content lines with proper highlighting
-      for _, content_line in ipairs(content_lines) do
-        local display_line = "  " .. content_line
-        table.insert(lines, display_line)
-        
-        table.insert(highlights, {
-          line = #lines - 1,
-          col_start = 0,
-          col_end = -1,
-          group = "LuxtermPreviewContent"
-        })
+    end
+
+    table.insert(lines, "")
+    table.insert(lines, "  " .. string.rep("─", 36))
+    table.insert(highlights, {
+      line = #lines - 1,
+      col_start = 0,
+      col_end = -1,
+      group = "LuxtermSeparator"
+    })
+    table.insert(lines, "")
+
+    local content_lines = session:get_content_preview()
+
+    if #content_lines > 0 then
+      local max_lines = 15
+      local start_idx = math.max(1, #content_lines - max_lines + 1)
+
+      for i = start_idx, #content_lines do
+        local content_line = content_lines[i]
+        if content_line and #content_line > 0 then
+          local display_line = "  " .. content_line:sub(1, 60)
+          table.insert(lines, display_line)
+
+          table.insert(highlights, {
+            line = #lines - 1,
+            col_start = 0,
+            col_end = -1,
+            group = "LuxtermPreviewContent"
+          })
+        end
       end
     else
       table.insert(lines, "  No recent output")
@@ -137,11 +174,8 @@ function M.update_preview(session)
       })
     end
   end
-  
-  -- Update buffer content using shared utility
+
   buffer_protection.update_protected_buffer_content(M.buffer_id, lines)
-  
-  -- Apply highlights optimized
   M.apply_highlights_optimized(highlights)
 end
 
