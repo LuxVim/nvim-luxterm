@@ -355,61 +355,53 @@ function M.add_session_content(lines, highlights, session, index, config)
 end
 
 function M.add_shortcuts_content(lines, highlights)
-  local shortcuts = {
-    {icon = "󰷈", label = "New session", key = "[n]"},
-    {icon = "󰆴", label = "Delete session", key = "[d]"},
-    {icon = "󰑕", label = "Rename session", key = "[r]"},
-    {icon = "󰅖", label = "Close", key = "[Esc]"}
-  }
-  
+  local line_num = #lines
+
+  table.insert(lines, string.rep("─", 40))
+  table.insert(highlights, {
+    line = line_num,
+    col_start = 0,
+    col_end = -1,
+    group = "LuxtermSeparator"
+  })
+
+  line_num = #lines
+
+  local shortcuts
   if #M.sessions_data == 0 then
-    shortcuts = {
-      {icon = "󰷈", label = "New session", key = "[n]"},
-      {icon = "󰅖", label = "Close", key = "[Esc]"}
-    }
+    shortcuts = "[n]ew  [Esc] close"
+  else
+    shortcuts = "[n]ew  [d]el  [r]ename  [p]review  [1-9] jump  [Esc]"
   end
-  
-  -- Calculate dynamic width for consistent spacing
-  local required_width = M.calculate_required_width()
-  
-  for _, item in ipairs(shortcuts) do
-    local line_num = #lines
-    local content = "  " .. item.icon .. "  " .. item.label
-    local content_width = vim.fn.strdisplaywidth(content)
-    local key_width = vim.fn.strdisplaywidth(item.key)
-    local padding_needed = required_width - content_width - key_width
-    local padding = string.rep(" ", padding_needed)
-    local full_line = content .. padding .. item.key
-    
-    table.insert(lines, full_line)
-    
-    -- Icon highlight (use byte length for col_end)
-    local icon_bytes = string.len(item.icon)
-    table.insert(highlights, {
-      line = line_num,
-      col_start = 2,
-      col_end = 2 + icon_bytes,
-      group = "LuxtermMenuIcon"
-    })
-    
-    -- Text highlight (use byte lengths for accurate positioning)
-    local label_bytes = string.len(item.label)
-    table.insert(highlights, {
-      line = line_num,
-      col_start = 4 + icon_bytes,
-      col_end = 4 + icon_bytes + label_bytes,
-      group = "LuxtermMenuText"
-    })
-    
-    -- Key highlight (calculate byte position properly)
-    local key_bytes = string.len(item.key)
-    local key_start = string.len(full_line) - key_bytes
-    table.insert(highlights, {
-      line = line_num,
-      col_start = key_start,
-      col_end = -1,
-      group = "LuxtermMenuKey"
-    })
+
+  local status_line = " " .. shortcuts
+  table.insert(lines, status_line)
+
+  local pos = 1
+  for key, label in shortcuts:gmatch("%[([^%]]+)%]([^%[]*)") do
+    local key_str = "[" .. key .. "]"
+    local key_start = status_line:find(key_str, pos, true)
+    if key_start then
+      table.insert(highlights, {
+        line = line_num,
+        col_start = key_start - 1,
+        col_end = key_start - 1 + #key_str,
+        group = "LuxtermKey"
+      })
+
+      local label_start = key_start + #key_str
+      local label_trimmed = label:match("^%s*(%S*)") or ""
+      if #label_trimmed > 0 then
+        table.insert(highlights, {
+          line = line_num,
+          col_start = label_start - 1,
+          col_end = label_start - 1 + #label + 1,
+          group = "LuxtermKeyLabel"
+        })
+      end
+
+      pos = key_start + #key_str
+    end
   end
 end
 
