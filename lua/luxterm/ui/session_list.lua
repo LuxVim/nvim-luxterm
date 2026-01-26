@@ -300,19 +300,25 @@ function M.add_session_content(lines, highlights, session, index, config)
     display_name = display_name:sub(1, 12) .. "..."
   end
 
-  local line = string.format("  %s %-15s %4s  %s", icon, display_name, time_since, hotkey)
+  local padded_name = display_name .. string.rep(" ", 15 - vim.fn.strdisplaywidth(display_name))
+  local padded_time = string.rep(" ", 4 - #time_since) .. time_since
+
+  local line = "  " .. icon .. " " .. padded_name .. " " .. padded_time .. "  " .. hotkey
   table.insert(lines, line)
+
+  local line_len = #line
 
   local icon_start = 2
   local icon_end = icon_start + #icon
   table.insert(highlights, {
     line = line_num,
     col_start = icon_start,
-    col_end = icon_end,
+    col_end = math.min(icon_end, line_len),
     group = icon_hl
   })
 
-  local name_col = 5
+  local name_start = icon_end + 1
+  local name_end = name_start + #padded_name
   local name_hl = is_selected and "LuxtermSelected" or "LuxtermSessionName"
   local fade_timeout = config.ui and config.ui.fade_timeout or 1800
   local diff_seconds = (vim.loop.now() - session.last_accessed) / 1000
@@ -322,24 +328,25 @@ function M.add_session_content(lines, highlights, session, index, config)
 
   table.insert(highlights, {
     line = line_num,
-    col_start = name_col,
-    col_end = name_col + #display_name,
+    col_start = name_start,
+    col_end = math.min(name_end, line_len),
     group = name_hl
   })
 
-  local time_col = 22
+  local time_start = name_end + 1
+  local time_end = time_start + #padded_time
   table.insert(highlights, {
     line = line_num,
-    col_start = time_col,
-    col_end = time_col + #time_since,
+    col_start = time_start,
+    col_end = math.min(time_end, line_len),
     group = "LuxtermTime"
   })
 
-  local hotkey_col = 28
+  local hotkey_start = time_end + 2
   table.insert(highlights, {
     line = line_num,
-    col_start = hotkey_col,
-    col_end = -1,
+    col_start = hotkey_start,
+    col_end = line_len,
     group = "LuxtermHotkey"
   })
 
@@ -347,7 +354,7 @@ function M.add_session_content(lines, highlights, session, index, config)
     table.insert(highlights, {
       line = line_num,
       col_start = 0,
-      col_end = -1,
+      col_end = line_len,
       group = "LuxtermSelected",
       priority = 50
     })
@@ -357,11 +364,12 @@ end
 function M.add_shortcuts_content(lines, highlights)
   local line_num = #lines
 
-  table.insert(lines, string.rep("─", 40))
+  local separator = string.rep("─", 40)
+  table.insert(lines, separator)
   table.insert(highlights, {
     line = line_num,
     col_start = 0,
-    col_end = -1,
+    col_end = #separator,
     group = "LuxtermSeparator"
   })
 
@@ -377,6 +385,8 @@ function M.add_shortcuts_content(lines, highlights)
   local status_line = " " .. shortcuts
   table.insert(lines, status_line)
 
+  local status_line_len = #status_line
+
   local pos = 1
   for key, label in shortcuts:gmatch("%[([^%]]+)%]([^%[]*)") do
     local key_str = "[" .. key .. "]"
@@ -385,7 +395,7 @@ function M.add_shortcuts_content(lines, highlights)
       table.insert(highlights, {
         line = line_num,
         col_start = key_start - 1,
-        col_end = key_start - 1 + #key_str,
+        col_end = math.min(key_start - 1 + #key_str, status_line_len),
         group = "LuxtermKey"
       })
 
@@ -395,7 +405,7 @@ function M.add_shortcuts_content(lines, highlights)
         table.insert(highlights, {
           line = line_num,
           col_start = label_start - 1,
-          col_end = label_start - 1 + #label + 1,
+          col_end = math.min(label_start - 1 + #label + 1, status_line_len),
           group = "LuxtermKeyLabel"
         })
       end
