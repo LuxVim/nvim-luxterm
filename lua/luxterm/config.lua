@@ -15,17 +15,26 @@ M.defaults = {
     next_session = "<C-k>",
     prev_session = "<C-j>",
     global_session_nav = false
+  },
+  ui = {
+    preview = "always",
+    split_ratio = 0.35,
+    width = 0.7,
+    height = 0.6,
+    stale_timeout = 300,
+    fade_timeout = 1800,
   }
 }
 
 -- Configuration schema for validation
 M.schema = {
   manager_width = "number",
-  manager_height = "number", 
+  manager_height = "number",
   preview_enabled = "boolean",
   focus_on_create = "boolean",
   auto_hide = "boolean",
-  keymaps = "table"
+  keymaps = "table",
+  ui = "table"
 }
 
 -- Current configuration
@@ -73,21 +82,28 @@ M.presets = {
   minimal = {
     preview_enabled = false,
     auto_hide = false,
-    manager_width = 0.4,
-    manager_height = 0.6
+    ui = {
+      preview = "toggle",
+      width = 0.4,
+      height = 0.5,
+    }
   },
-  
+
   compact = {
-    manager_width = 0.6,
-    manager_height = 0.5,
-    preview_enabled = true
+    ui = {
+      preview = "always",
+      width = 0.6,
+      height = 0.5,
+    }
   },
-  
+
   full_screen = {
-    manager_width = 0.95,
-    manager_height = 0.9,
-    preview_enabled = true,
-    auto_hide = false
+    auto_hide = false,
+    ui = {
+      preview = "always",
+      width = 0.95,
+      height = 0.9,
+    }
   }
 }
 
