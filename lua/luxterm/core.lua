@@ -409,7 +409,13 @@ end
 
 -- Helper functions for open_manager
 local function calculate_manager_dimensions()
-  local total_width, total_height = utils.calculate_size_from_ratio(get_config("manager_width"), get_config("manager_height"))
+  local cfg = config.get()
+  local ui_config = cfg.ui or {}
+
+  local width_ratio = ui_config.width or cfg.manager_width or 0.7
+  local height_ratio = ui_config.height or cfg.manager_height or 0.6
+
+  local total_width, total_height = utils.calculate_size_from_ratio(width_ratio, height_ratio)
   local row, col = utils.calculate_centered_position(total_width, total_height)
   return total_width, total_height, row, col
 end
@@ -422,18 +428,21 @@ end
 
 local function setup_split_layout(total_width, total_height, row, col)
   local session_list = require("luxterm.ui.session_list")
-  local required_width = session_list.calculate_required_width() + 2
-  local left_width = math.min(required_width, math.floor(total_width * 0.6))
+  local cfg = config.get()
+  local ui_config = cfg.ui or {}
+
+  local split_ratio = ui_config.split_ratio or 0.35
+  local left_width = math.floor(total_width * split_ratio)
   local left_width_ratio = left_width / total_width
-  
+
   local base_config = {
     width = total_width,
     height = total_height,
     row = row,
     col = col,
-    border = "rounded"
+    border = "single"
   }
-  
+
   local left_config = {
     title = " Sessions ",
     width_ratio = left_width_ratio,
@@ -442,7 +451,7 @@ local function setup_split_layout(total_width, total_height, row, col)
     auto_hide = get_config("auto_hide"),
     auto_hide_callback = create_auto_hide_callback()
   }
-  
+
   local right_config = {
     title = " Preview ",
     enter = false,
@@ -450,19 +459,18 @@ local function setup_split_layout(total_width, total_height, row, col)
     auto_hide = get_config("auto_hide"),
     auto_hide_callback = create_auto_hide_callback()
   }
-  
+
   local windows = floating_window.create_split_layout(base_config, left_config, right_config)
-  
+
   M.manager_layout = {
     type = "split",
     windows = windows
   }
-  
-  -- Initialize components
+
   session_list.window_id = windows.left.winid
   session_list.buffer_id = windows.left.bufnr
   session_list.setup_keymaps()
-  
+
   preview_pane.create_window(windows.right.winid, windows.right.bufnr)
 end
 
