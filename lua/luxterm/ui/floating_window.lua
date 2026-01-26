@@ -8,7 +8,7 @@ local M = {}
 M.window_types = {
   session_list = {
     relative = "editor",
-    border = "rounded",
+    border = "single",
     title = " Sessions ",
     title_pos = "center",
     style = "minimal",
@@ -16,20 +16,20 @@ M.window_types = {
     protected = true,
     hide_cursor = true
   },
-  
+
   preview = {
-    relative = "editor", 
-    border = "rounded",
+    relative = "editor",
+    border = "single",
     title = " Preview ",
     title_pos = "center",
     style = "minimal",
     buffer_options = utils.buffer_presets.luxterm_preview,
     hide_cursor = true
   },
-  
+
   session_terminal = {
     relative = "editor",
-    border = "rounded",
+    border = "single",
     title_pos = "center",
     style = "minimal",
     zindex = 100,
