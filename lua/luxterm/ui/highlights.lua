@@ -8,25 +8,62 @@ M.highlight_groups = {
   "LuxtermSessionNameSelected",
   "LuxtermSessionSelected",
   "LuxtermBorderSelected",
-  
+
   -- Normal/Inactive states
   "LuxtermSessionIcon",
-  "LuxtermSessionName", 
+  "LuxtermSessionName",
   "LuxtermSessionNormal",
   "LuxtermBorderNormal",
-  
+
   -- Menu items
   "LuxtermMenuIcon",
   "LuxtermMenuText",
-  "LuxtermMenuKey", 
-  
+  "LuxtermMenuKey",
+
   -- Preview pane
   "LuxtermPreviewTitle",
   "LuxtermPreviewContent",
   "LuxtermPreviewEmpty",
-  
+
   -- Interactive elements
-  "LuxtermSessionKey"
+  "LuxtermSessionKey",
+
+  -- New redesign highlights
+  "LuxtermStatusActive",
+  "LuxtermStatusStale",
+  "LuxtermStatusStopped",
+  "LuxtermStatusError",
+  "LuxtermSelected",
+  "LuxtermDimmed",
+  "LuxtermDirectory",
+  "LuxtermProcess",
+  "LuxtermCommand",
+  "LuxtermKey",
+  "LuxtermKeyLabel",
+  "LuxtermSeparator",
+  "LuxtermTime",
+  "LuxtermHotkey",
+}
+
+M.linked_highlights = {
+  LuxtermStatusActive = "DiagnosticOk",
+  LuxtermStatusStale = "DiagnosticWarn",
+  LuxtermStatusStopped = "Comment",
+  LuxtermStatusError = "DiagnosticError",
+  LuxtermSelected = "Visual",
+  LuxtermDimmed = "Comment",
+  LuxtermDirectory = "Directory",
+  LuxtermProcess = "Normal",
+  LuxtermCommand = "Comment",
+  LuxtermKey = "Special",
+  LuxtermKeyLabel = "Comment",
+  LuxtermSeparator = "Comment",
+  LuxtermTime = "Comment",
+  LuxtermHotkey = "Comment",
+  LuxtermSessionName = "Normal",
+  LuxtermPreviewTitle = "Title",
+  LuxtermPreviewContent = "Normal",
+  LuxtermPreviewEmpty = "Comment",
 }
 
 -- Fallback colors if no colorscheme defines them
@@ -58,16 +95,21 @@ M.fallback_highlights = {
 }
 
 function M.setup_all()
-  -- Don't set any highlights - let colorscheme handle them
-  -- Only set as last resort if no highlights are defined at all
+  for group_name, link_target in pairs(M.linked_highlights) do
+    local existing = vim.api.nvim_get_hl(0, { name = group_name })
+    if vim.tbl_isempty(existing) then
+      vim.api.nvim_set_hl(0, group_name, { link = link_target })
+    end
+  end
+
   vim.defer_fn(function()
-    for _, group_name in ipairs(M.highlight_groups) do
+    for group_name, fallback in pairs(M.fallback_highlights) do
       local existing = vim.api.nvim_get_hl(0, { name = group_name })
-      if vim.tbl_isempty(existing) and M.fallback_highlights[group_name] then
-        vim.api.nvim_set_hl(0, group_name, M.fallback_highlights[group_name])
+      if vim.tbl_isempty(existing) then
+        vim.api.nvim_set_hl(0, group_name, fallback)
       end
     end
-  end, 200) -- Delay to let colorscheme load first
+  end, 200)
 end
 
 function M.setup_session_highlights()
