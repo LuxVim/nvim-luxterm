@@ -140,7 +140,11 @@ local function create_session(opts)
     name = name,
     bufnr = opts.bufnr,
     created_at = vim.loop.now(),
-    last_accessed = vim.loop.now()
+    last_accessed = vim.loop.now(),
+    cwd = opts.cwd or vim.fn.getcwd(),
+    shell = vim.o.shell,
+    last_command = nil,
+    command_history = {},
   }
   
   M.next_id = M.next_id + 1
@@ -215,7 +219,112 @@ local function create_session(opts)
     
     return preview
   end
-  
+
+  function session:get_cwd()
+    if not self:is_valid() then
+      return self.cwd or "unknown"
+    end
+
+    local job_id = vim.bo[self.bufnr].channel
+    if job_id and job_id > 0 then
+      local pid = vim.fn.jobpid(job_id)
+      if pid then
+        local cwd_path = nil
+        local uname = vim.loop.os_uname().sysname
+
+        if uname == "Darwin" then
+          local handle = io.popen("lsof -p " .. pid .. " 2>/dev/null | grep cwd | awk '{print $NF}'")
+          if handle then
+            cwd_path = handle:read("*l")
+            handle:close()
+          end
+        else
+          cwd_path = vim.fn.resolve("/proc/" .. pid .. "/cwd")
+          if vim.fn.isdirectory(cwd_path) ~= 1 then
+            cwd_path = nil
+          end
+        end
+
+        if cwd_path and cwd_path ~= "" then
+          self.cwd = cwd_path
+          return cwd_path
+        end
+      end
+    end
+
+    return self.cwd or vim.fn.getcwd()
+  end
+
+  function session:get_process()
+    if not self:is_valid() then
+      return nil, "stopped"
+    end
+
+    local job_id = vim.bo[self.bufnr].channel
+    if not job_id or job_id <= 0 then
+      return nil, "idle"
+    end
+
+    local pid = vim.fn.jobpid(job_id)
+    if not pid then
+      return nil, "idle"
+    end
+
+    local proc_info = vim.api.nvim_get_proc(pid)
+    if proc_info and proc_info.name then
+      local proc_name = proc_info.name
+      local shell_name = vim.fn.fnamemodify(vim.o.shell, ":t")
+      if proc_name == shell_name then
+        return nil, "idle"
+      end
+      return proc_name, "running"
+    end
+
+    return nil, "idle"
+  end
+
+  function session:get_last_command()
+    if self.last_command then
+      return self.last_command
+    end
+
+    if not self:is_valid() then
+      return nil
+    end
+
+    local lines = vim.api.nvim_buf_get_lines(self.bufnr, -50, -1, false)
+    for i = #lines, 1, -1 do
+      local line = lines[i]
+      if line:match("^%s*%$%s+(.+)") then
+        local cmd = line:match("^%s*%$%s+(.+)")
+        self.last_command = cmd
+        return cmd
+      elseif line:match("^%s*%%%s+(.+)") then
+        local cmd = line:match("^%s*%%%s+(.+)")
+        self.last_command = cmd
+        return cmd
+      end
+    end
+
+    return nil
+  end
+
+  function session:get_time_since_active()
+    local now = vim.loop.now()
+    local diff_ms = now - self.last_accessed
+    local diff_seconds = math.floor(diff_ms / 1000)
+
+    if diff_seconds < 60 then
+      return "now"
+    elseif diff_seconds < 3600 then
+      return math.floor(diff_seconds / 60) .. "m"
+    elseif diff_seconds < 86400 then
+      return math.floor(diff_seconds / 3600) .. "h"
+    else
+      return math.floor(diff_seconds / 86400) .. "d"
+    end
+  end
+
   return session
 end
 
@@ -504,6 +613,23 @@ function M.setup_autocmds()
       end
     end
   })
+end
+
+function M.serialize_session(session)
+  return {
+    id = session.id,
+    name = session.name,
+    cwd = session.cwd,
+    shell = session.shell,
+    created_at = session.created_at,
+    last_accessed = session.last_accessed,
+    last_command = session.last_command,
+    command_history = session.command_history,
+  }
+end
+
+function M.deserialize_session(data)
+  return data
 end
 
 return M
