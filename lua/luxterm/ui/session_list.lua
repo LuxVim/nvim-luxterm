@@ -339,39 +339,21 @@ function M.add_session_content(lines, highlights, session, index, config)
   local process, _ = session:get_process()
   local time_since = session:get_time_since_active()
 
+  local cwd = session:get_cwd()
+  local folder = cwd and vim.fn.fnamemodify(cwd, ":t") or ""
+  if #folder > 14 then
+    folder = folder:sub(1, 11) .. "..."
+  end
+
   local detail
   if process then
-    local cwd = session:get_cwd()
-    local short_cwd = ""
-    if cwd then
-      short_cwd = vim.fn.fnamemodify(cwd, ":t")
-      if #short_cwd > 12 then
-        short_cwd = short_cwd:sub(1, 9) .. "..."
-      end
-    end
-    if short_cwd ~= "" then
-      detail = process .. " " .. short_cwd
+    if folder ~= "" then
+      detail = process .. " " .. folder
     else
       detail = process
     end
   else
-    local cwd = session:get_cwd()
-    if cwd then
-      local home = vim.fn.expand("~")
-      if cwd:sub(1, #home) == home then
-        cwd = "~" .. cwd:sub(#home + 1)
-      end
-      if #cwd > 20 then
-        cwd = "..." .. cwd:sub(-17)
-      end
-      detail = cwd
-    else
-      detail = "shell"
-    end
-  end
-
-  if #detail > 22 then
-    detail = detail:sub(1, 19) .. "..."
+    detail = folder ~= "" and folder or "shell"
   end
 
   local line2 = "    └ " .. detail
