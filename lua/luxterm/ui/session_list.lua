@@ -289,36 +289,30 @@ end
 
 function M.add_session_content(lines, highlights, session, index, config)
   local is_selected = index == M.selected_session_index
-  local line_num = #lines
+  local line1_num = #lines
 
   local icon, icon_hl = M.get_status_icon_and_highlight(session, config)
-  local display_name = M.get_display_name(session)
-  local time_since = session:get_time_since_active()
+  local session_name = session.name
   local hotkey = string.format("[%d]", index)
 
-  if #display_name > 15 then
-    display_name = display_name:sub(1, 12) .. "..."
+  if #session_name > 20 then
+    session_name = session_name:sub(1, 17) .. "..."
   end
 
-  local padded_name = display_name .. string.rep(" ", 15 - vim.fn.strdisplaywidth(display_name))
-  local padded_time = string.rep(" ", 4 - #time_since) .. time_since
+  local line1 = "  " .. icon .. " " .. session_name
+  local padding1 = string.rep(" ", math.max(1, 28 - vim.fn.strdisplaywidth(line1)))
+  line1 = line1 .. padding1 .. hotkey
+  table.insert(lines, line1)
+  local line1_len = #line1
 
-  local line = "  " .. icon .. " " .. padded_name .. " " .. padded_time .. "  " .. hotkey
-  table.insert(lines, line)
-
-  local line_len = #line
-
-  local icon_start = 2
-  local icon_end = icon_start + #icon
   table.insert(highlights, {
-    line = line_num,
-    col_start = icon_start,
-    col_end = math.min(icon_end, line_len),
+    line = line1_num,
+    col_start = 2,
+    col_end = math.min(2 + #icon, line1_len),
     group = icon_hl
   })
 
-  local name_start = icon_end + 1
-  local name_end = name_start + #padded_name
+  local name_start = 2 + #icon + 1
   local name_hl = is_selected and "LuxtermSelected" or "LuxtermSessionName"
   local fade_timeout = config.ui and config.ui.fade_timeout or 1800
   local diff_seconds = (vim.loop.now() - session.last_accessed) / 1000
@@ -327,34 +321,84 @@ function M.add_session_content(lines, highlights, session, index, config)
   end
 
   table.insert(highlights, {
-    line = line_num,
+    line = line1_num,
     col_start = name_start,
-    col_end = math.min(name_end, line_len),
+    col_end = math.min(name_start + #session_name, line1_len),
     group = name_hl
   })
 
-  local time_start = name_end + 1
-  local time_end = time_start + #padded_time
+  local hotkey_start = line1_len - #hotkey
   table.insert(highlights, {
-    line = line_num,
-    col_start = time_start,
-    col_end = math.min(time_end, line_len),
-    group = "LuxtermTime"
+    line = line1_num,
+    col_start = hotkey_start,
+    col_end = line1_len,
+    group = "LuxtermHotkey"
   })
 
-  local hotkey_start = time_end + 2
+  local line2_num = #lines
+  local process, _ = session:get_process()
+  local time_since = session:get_time_since_active()
+
+  local detail
+  if process then
+    local cwd = session:get_cwd()
+    local short_cwd = ""
+    if cwd then
+      short_cwd = vim.fn.fnamemodify(cwd, ":t")
+      if #short_cwd > 12 then
+        short_cwd = short_cwd:sub(1, 9) .. "..."
+      end
+    end
+    if short_cwd ~= "" then
+      detail = process .. " " .. short_cwd
+    else
+      detail = process
+    end
+  else
+    local cwd = session:get_cwd()
+    if cwd then
+      local home = vim.fn.expand("~")
+      if cwd:sub(1, #home) == home then
+        cwd = "~" .. cwd:sub(#home + 1)
+      end
+      if #cwd > 20 then
+        cwd = "..." .. cwd:sub(-17)
+      end
+      detail = cwd
+    else
+      detail = "shell"
+    end
+  end
+
+  if #detail > 22 then
+    detail = detail:sub(1, 19) .. "..."
+  end
+
+  local line2 = "    └ " .. detail
+  local padding2 = string.rep(" ", math.max(1, 26 - vim.fn.strdisplaywidth(line2)))
+  line2 = line2 .. padding2 .. time_since
+  table.insert(lines, line2)
+  local line2_len = #line2
+
   table.insert(highlights, {
-    line = line_num,
-    col_start = hotkey_start,
-    col_end = line_len,
-    group = "LuxtermHotkey"
+    line = line2_num,
+    col_start = 0,
+    col_end = line2_len,
+    group = "LuxtermDimmed"
   })
 
   if is_selected then
     table.insert(highlights, {
-      line = line_num,
+      line = line1_num,
       col_start = 0,
-      col_end = line_len,
+      col_end = line1_len,
+      group = "LuxtermSelected",
+      priority = 50
+    })
+    table.insert(highlights, {
+      line = line2_num,
+      col_start = 0,
+      col_end = line2_len,
       group = "LuxtermSelected",
       priority = 50
     })
@@ -453,19 +497,6 @@ function M.get_status_icon_and_highlight(session, config)
 end
 
 function M.get_display_name(session)
-  local process, _ = session:get_process()
-  if process then
-    return process
-  end
-
-  local cwd = session:get_cwd()
-  if cwd then
-    local basename = vim.fn.fnamemodify(cwd, ":t")
-    if basename and basename ~= "" then
-      return basename
-    end
-  end
-
   return session.name
 end
 
