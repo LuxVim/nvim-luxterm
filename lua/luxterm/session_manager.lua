@@ -227,8 +227,8 @@ local function create_session(opts)
 
     local job_id = vim.bo[self.bufnr].channel
     if job_id and job_id > 0 then
-      local pid = vim.fn.jobpid(job_id)
-      if pid then
+      local ok, pid = pcall(vim.fn.jobpid, job_id)
+      if ok and pid then
         local cwd_path = nil
         local uname = vim.loop.os_uname().sysname
 
@@ -265,8 +265,8 @@ local function create_session(opts)
       return nil, "idle"
     end
 
-    local pid = vim.fn.jobpid(job_id)
-    if not pid then
+    local ok, pid = pcall(vim.fn.jobpid, job_id)
+    if not ok or not pid then
       return nil, "idle"
     end
 
@@ -331,18 +331,37 @@ end
 -- Session management functions
 function M.create_session(opts)
   opts = opts or {}
-  
+
   -- Create terminal buffer if not provided
   local bufnr = opts.bufnr
   if not bufnr then
     -- Create a completely fresh buffer for terminal
     bufnr = vim.api.nvim_create_buf(true, false)
-    
-    -- Switch to buffer temporarily to run termopen
-    local current_buf = vim.api.nvim_get_current_buf()
-    vim.api.nvim_set_current_buf(bufnr)
-    vim.fn.termopen(vim.o.shell)
-    vim.api.nvim_set_current_buf(current_buf)
+
+    -- Create a minimal hidden floating window to run termopen
+    -- This avoids disturbing the user's current window/buffer layout
+    local temp_winid = vim.api.nvim_open_win(bufnr, false, {
+      relative = "editor",
+      width = 1,
+      height = 1,
+      row = 0,
+      col = 0,
+      style = "minimal",
+      focusable = false,
+      noautocmd = true,
+    })
+
+    -- Run termopen in the temporary window
+    vim.api.nvim_win_call(temp_winid, function()
+      vim.fn.termopen(vim.o.shell)
+    end)
+
+    -- Close the temporary window after the event loop processes the terminal setup
+    vim.schedule(function()
+      if vim.api.nvim_win_is_valid(temp_winid) then
+        vim.api.nvim_win_close(temp_winid, true)
+      end
+    end)
   end
   
   -- Ensure swap files are disabled for all luxterm terminal buffers
