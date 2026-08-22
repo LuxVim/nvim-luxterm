@@ -225,7 +225,8 @@ function M.create_session(opts)
   
   local bufnr = opts.bufnr
   if not bufnr then
-    bufnr = vim.api.nvim_create_buf(true, false)
+    local listed = opts.session_as_buffer ~= false
+    bufnr = vim.api.nvim_create_buf(listed, not listed)
 
     local win_config = {
       relative = "editor",

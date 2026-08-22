@@ -97,6 +97,9 @@ require("luxterm").setup({
   
   -- Auto-hide floating windows when cursor leaves
   auto_hide = true,
+
+  -- List terminal buffers in :buffers, BufferLine, etc. (false = scratch only)
+  session_as_buffer = true,
   
   -- Keybinding configuration
   keymaps = {

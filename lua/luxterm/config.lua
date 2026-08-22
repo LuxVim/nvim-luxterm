@@ -10,6 +10,7 @@ M.defaults = {
   preview_enabled = true,
   focus_on_create = false,
   auto_hide = true,
+  session_as_buffer = true,
   keymaps = {
     toggle_manager = "<C-/>",
     next_session = "<C-k>",
@@ -26,6 +27,7 @@ M.schema = {
   preview_enabled = "boolean",
   focus_on_create = "boolean",
   auto_hide = "boolean",
+  session_as_buffer = "boolean",
   keymaps = "table"
 }
 

@@ -625,7 +625,8 @@ function M.create_session(opts)
   
   local session = session_manager.create_session({
     name = opts.name,
-    activate = opts.activate
+    activate = opts.activate,
+    session_as_buffer = get_config("session_as_buffer")
   })
   
   events.emit(events.SESSION_CREATED, {session = session})
